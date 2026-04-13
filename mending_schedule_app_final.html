@@ -132,7 +132,6 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
       <button onclick="openCopyModal()" style="font-size:12px;padding:4px 12px;border:0.5px solid var(--border-light);border-radius:var(--radius-md);background:transparent;cursor:pointer;color:var(--text-secondary);font-family:var(--font)">Copy from prev week</button>
     </div>
     <div class="day-select" id="mgr-days"></div>
-    <div class="ob-row" id="ob-row"><div class="ob-label" id="ob-label"></div><label class="toggle-switch"><input type="checkbox" id="ob-toggle" onchange="onOBToggle()"><span class="toggle-slider"></span></label></div>
     <div id="mgr-alert"></div>
     <div class="cov-bar-wrap" id="mgr-cov"></div>
     <div class="legend" id="legend"></div>
@@ -269,7 +268,7 @@ tf.setDate(td.getDate()+(td.getDay()===5?0:dtf));
 
 let sched=JSON.parse(JSON.stringify(BASE)),fsched=JSON.parse(JSON.stringify(BF));
 // noOB and ooo now keyed by ISO date string 'YYYY-MM-DD' instead of day name
-let noOB={};  // {dateStr: true/false}
+let noOB={};  // {dateStr: {Ebony:bool, Marisa:bool, Ky:bool}}
 let ooo={};   // {agent: {dateStr: true/false}}
 AGENTS.forEach(a=>{ooo[a]={};});
 let pRed=null,pendingForce=null;
@@ -370,7 +369,7 @@ function toggleOOO(agent,dateStr){
 function gBlocks(agent,day,fw,tS,tF){
   let blocks=day==='Friday'?(tF||fsched)[fw][agent]||[]:(tS||sched)[agent][day]||[];
   const dateStr=toISO(dateOfDay(day,weekOffset));
-  if(day!=='Friday'&&noOB[dateStr]){
+  if(day!=='Friday'&&noOB[dateStr]&&noOB[dateStr][agent]){
     blocks=mergeOP(blocks.map(x=>x[0]==='Outbound'?['On Phones',x[1],x[2]]:x));
   }
   if(ooo[agent]&&ooo[agent][dateStr]) return blocks;
@@ -385,20 +384,11 @@ function mergeOP(b){
   for(let i=1;i<s.length;i++){const n=s[i];if(c[0]==='On Phones'&&n[0]==='On Phones'&&t2m(c[2])===t2m(n[1])){c=['On Phones',c[1],n[2]];}else{m.push(c);c=n;}}
   m.push(c);return m;
 }
-function onOBToggle(){
-  if(mDay==='Friday')return;
-  const dateStr=toISO(dateOfDay(mDay,weekOffset));
-  noOB[dateStr]=document.getElementById('ob-toggle').checked;
+function toggleAgentOB(agent,dateStr){
+  if(!managerUnlocked){requirePIN('manager');return;}
+  if(!noOB[dateStr]) noOB[dateStr]={};
+  noOB[dateStr][agent]=!noOB[dateStr][agent];
   save();renderAll();
-}
-function updateOBUI(){
-  const row=document.getElementById('ob-row'),lbl=document.getElementById('ob-label'),tog=document.getElementById('ob-toggle');
-  if(mDay==='Friday'){row.style.display='none';return;}
-  const dateStr=toISO(dateOfDay(mDay,weekOffset));
-  row.style.display='flex';tog.checked=!!noOB[dateStr];
-  lbl.innerHTML=noOB[dateStr]
-    ?`<strong>No outbound calls today</strong> — agents on inbound during outbound blocks <span class="ob-badge noob">No Outbound</span>`
-    :`<strong>Outbound calls active</strong> — toggle off if no outbound today <span class="ob-badge">With Outbound</span>`;
 }
 function getTZOffsetMins(tz){
   const ianaMap={EST:'America/New_York',CST:'America/Chicago',PST:'America/Los_Angeles'};
@@ -798,28 +788,34 @@ function forceApply(){
 function renderManager(){
   const mDateStr=toISO(dateOfDay(mDay,weekOffset));
   if(mDay==='Friday') mFW=getFriWeekForDate(dateOfDay('Friday',weekOffset));
-  buildDayBtns('mgr-days',mDay,mFW,'setMDay','setMgrFriWeek','navWeek');updateOBUI();
+  buildDayBtns('mgr-days',mDay,mFW,'setMDay','setMgrFriWeek','navWeek');
   renderCovBar(mDay,mFW,'mgr-cov','mgr-alert');
   const wrap=document.getElementById('mgr-timelines');wrap.innerHTML='';
   AGENTS.forEach(a=>{
     const tz=ATZ[a];
     const isOOO=ooo[a]&&ooo[a][mDateStr];
+    const isNoOB=mDay!=='Friday'&&noOB[mDateStr]&&noOB[mDateStr][a];
     const div=document.createElement('div');div.className='agent-row';
     div.innerHTML=`
       <div class="agent-header">
         <div style="display:flex;align-items:center;gap:8px">
           <div class="agent-name" style="${isOOO?'opacity:0.4;text-decoration:line-through':''}">${a}</div>
           ${isOOO?`<span style="font-size:10px;background:#FAEEDA;color:#633806;border:0.5px solid #FAC775;padding:1px 7px;border-radius:20px;font-weight:500">OOO</span>`:''}
+          ${isNoOB&&!isOOO?`<span style="font-size:10px;background:#E6F1FB;color:#185FA5;border:0.5px solid #B5D4F4;padding:1px 7px;border-radius:20px;font-weight:500">No OB</span>`:''}
         </div>
-        <div style="display:flex;align-items:center;gap:8px">
+        <div style="display:flex;align-items:center;gap:6px">
           <div class="tz-pills">
             <span class="tz-pill agent">${tz}</span>
             <span style="font-size:10px;color:var(--text-tertiary)">·</span>
             <span class="tz-pill pst">PST</span>
           </div>
+          ${mDay!=='Friday'&&!isOOO?`<button onclick="toggleAgentOB('${a}','${mDateStr}')"
+            style="font-size:11px;padding:2px 9px;border-radius:20px;cursor:pointer;font-family:var(--font);border:0.5px solid;${isNoOB?'background:#E6F1FB;color:#185FA5;border-color:#B5D4F4':'background:var(--bg-secondary);color:var(--text-tertiary);border-color:var(--border-light)'}">
+            ${isNoOB?'✓ OB on':'No OB'}
+          </button>`:''}
           <button onclick="toggleOOO('${a}','${mDateStr}')"
             style="font-size:11px;padding:2px 9px;border-radius:20px;cursor:pointer;font-family:var(--font);border:0.5px solid;${isOOO?'background:#EAF3DE;color:#27500A;border-color:#C0DD97':'background:var(--bg-secondary);color:var(--text-tertiary);border-color:var(--border-light)'}">
-            ${isOOO?'✓ Back in office':'Mark OOO'}
+            ${isOOO?'✓ Back':'OOO'}
           </button>
         </div>
       </div>
@@ -840,7 +836,7 @@ function renderManager(){
   const dateDisp=new Date(mDateStr+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
   document.getElementById('mgr-summary').innerHTML=`
     <div class="sum-card"><div class="sum-lbl">Inbound coverage</div><div class="sum-val">${(ph/60).toFixed(1)}h</div><div class="sum-sub">across working agents</div></div>
-    <div class="sum-card"><div class="sum-lbl">Outbound coverage</div><div class="sum-val">${(ob/60).toFixed(1)}h</div><div class="sum-sub">${mDay!=='Friday'&&noOB[mDateStr]?'No outbound today':'across working agents'}</div></div>
+    <div class="sum-card"><div class="sum-lbl">Outbound coverage</div><div class="sum-val">${(ob/60).toFixed(1)}h</div><div class="sum-sub">${AGENTS.some(a=>noOB[mDateStr]&&noOB[mDateStr][a])?'Some agents no OB':'across working agents'}</div></div>
     <div class="sum-card"><div class="sum-lbl">Agents working</div><div class="sum-val">${AGENTS.filter(a=>!(ooo[a]&&ooo[a][mDateStr])).length}</div><div class="sum-sub">of ${AGENTS.length} on ${dateDisp}</div></div>`;
 }
 function setMDay(d){mDay=d;renderManager();}
@@ -1093,7 +1089,10 @@ function confirmCopy(){
     DAYS.forEach(d=>{
       const prevDateStr=toISO(dateOfDay(d,prevOffset));
       const curDateStr=toISO(dateOfDay(d,weekOffset));
-      if(noOB[prevDateStr]) noOB[curDateStr]=true;
+      if(noOB[prevDateStr]){
+        if(!noOB[curDateStr]) noOB[curDateStr]={};
+        AGENTS.forEach(a=>{if(noOB[prevDateStr][a]) noOB[curDateStr][a]=true;});
+      }
       AGENTS.forEach(a=>{
         if(ooo[a]&&ooo[a][prevDateStr]) ooo[a][curDateStr]=true;
       });
@@ -1114,7 +1113,10 @@ function confirmCopy(){
         sched[a][day]=JSON.parse(JSON.stringify(sched[a][day]||BASE[a][day]));
       });
     }
-    if(noOB[prevDateStr]) noOB[curDateStr]=true;
+    if(noOB[prevDateStr]){
+      if(!noOB[curDateStr]) noOB[curDateStr]={};
+      AGENTS.forEach(a=>{if(noOB[prevDateStr][a]) noOB[curDateStr][a]=true;});
+    }
     AGENTS.forEach(a=>{
       if(ooo[a]&&ooo[a][prevDateStr]) ooo[a][curDateStr]=true;
     });
