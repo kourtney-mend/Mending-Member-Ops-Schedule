@@ -251,10 +251,58 @@ const td=new Date(),dtf=(5-td.getDay()+7)%7||7,tf=new Date(td);
 tf.setDate(td.getDate()+(td.getDay()===5?0:dtf));
 
 let sched=JSON.parse(JSON.stringify(BASE)),fsched=JSON.parse(JSON.stringify(BF));
-let noOB={Monday:false,Tuesday:false,Wednesday:false,Thursday:false};
-// ooo: {Ebony:{Monday:false,...}, Marisa:{...}, Ky:{...}}
-let ooo={Ebony:{Monday:false,Tuesday:false,Wednesday:false,Thursday:false,Friday:false},Marisa:{Monday:false,Tuesday:false,Wednesday:false,Thursday:false,Friday:false},Ky:{Monday:false,Tuesday:false,Wednesday:false,Thursday:false,Friday:false}};
+// noOB and ooo now keyed by ISO date string 'YYYY-MM-DD' instead of day name
+let noOB={};  // {dateStr: true/false}
+let ooo={};   // {agent: {dateStr: true/false}}
+AGENTS.forEach(a=>{ooo[a]={};});
 let pRed=null,pendingForce=null;
+
+// ── Week navigation ──────────────────────────────────────────
+// weekOffset: 0 = current week, 1 = next week, -1 = last week, etc.
+let weekOffset=0;
+
+function getMonday(offset){
+  const now=new Date();
+  const day=now.getDay(); // 0=Sun,1=Mon,...
+  const diffToMon=day===0?-6:1-day;
+  const mon=new Date(now);
+  mon.setDate(now.getDate()+diffToMon+(offset*7));
+  mon.setHours(0,0,0,0);
+  return mon;
+}
+
+function dateOfDay(dayName,offset){
+  // Returns Date object for the given day name in the given week offset
+  const mon=getMonday(offset);
+  const dayIdx={Monday:0,Tuesday:1,Wednesday:2,Thursday:3,Friday:4}[dayName]||0;
+  const d=new Date(mon);
+  d.setDate(mon.getDate()+dayIdx);
+  return d;
+}
+
+function toISO(d){
+  return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function fmtDayBtn(dayName,offset){
+  const d=dateOfDay(dayName,offset);
+  const mon=d.getMonth()+1,dt=d.getDate();
+  return`${dayName.slice(0,3)} ${mon}/${dt}`;
+}
+
+function isToday(dayName,offset){
+  const d=dateOfDay(dayName,offset);
+  const now=new Date();
+  return d.getDate()===now.getDate()&&d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();
+}
+
+// Compute Friday AH week from a specific date
+function getFriWeekForDate(d){
+  const diff=Math.round((d-AF)/(7*24*3600*1000));
+  return ROT[((diff%3)+3)%3];
+}
+
+// State: current selected day name + week offset (shared across views)
 let mDay='Monday',mFW=gfw(tf),aView='Ebony',aDay='Monday',aFW=gfw(tf),cDay='Monday',cFW=gfw(tf);
 
 function save(){
@@ -295,22 +343,21 @@ function applyOOOCoverage(blocks){
   return result;
 }
 
-function toggleOOO(agent,day){
+function toggleOOO(agent,dateStr){
   if(!managerUnlocked){requirePIN('manager');return;}
-  ooo[agent][day]=!ooo[agent][day];
+  if(!ooo[agent])ooo[agent]={};
+  ooo[agent][dateStr]=!ooo[agent][dateStr];
   save();renderAll();
 }
 
 function gBlocks(agent,day,fw,tS,tF){
   let blocks=day==='Friday'?(tF||fsched)[fw][agent]||[]:(tS||sched)[agent][day]||[];
-  // Apply no-outbound mode for weekdays
-  if(day!=='Friday'&&noOB[day]){
+  const dateStr=toISO(dateOfDay(day,weekOffset));
+  if(day!=='Friday'&&noOB[dateStr]){
     blocks=mergeOP(blocks.map(x=>x[0]==='Outbound'?['On Phones',x[1],x[2]]:x));
   }
-  // If this agent is OOO, return their blocks as-is (shown greyed)
-  if(ooo[agent]&&ooo[agent][day]) return blocks;
-  // If any OTHER agent is OOO today, apply simplified coverage for this agent
-  const someoneOOO=AGENTS.filter(a=>a!==agent&&ooo[a]&&ooo[a][day]).length>0;
+  if(ooo[agent]&&ooo[agent][dateStr]) return blocks;
+  const someoneOOO=AGENTS.filter(a=>a!==agent&&ooo[a]&&ooo[a][dateStr]).length>0;
   if(someoneOOO) return applyOOOCoverage(blocks);
   return blocks;
 }
@@ -323,13 +370,16 @@ function mergeOP(b){
 }
 function onOBToggle(){
   if(mDay==='Friday')return;
-  noOB[mDay]=document.getElementById('ob-toggle').checked;save();renderAll();
+  const dateStr=toISO(dateOfDay(mDay,weekOffset));
+  noOB[dateStr]=document.getElementById('ob-toggle').checked;
+  save();renderAll();
 }
 function updateOBUI(){
   const row=document.getElementById('ob-row'),lbl=document.getElementById('ob-label'),tog=document.getElementById('ob-toggle');
   if(mDay==='Friday'){row.style.display='none';return;}
-  row.style.display='flex';tog.checked=noOB[mDay];
-  lbl.innerHTML=noOB[mDay]
+  const dateStr=toISO(dateOfDay(mDay,weekOffset));
+  row.style.display='flex';tog.checked=!!noOB[dateStr];
+  lbl.innerHTML=noOB[dateStr]
     ?`<strong>No outbound calls today</strong> — agents on inbound during outbound blocks <span class="ob-badge noob">No Outbound</span>`
     :`<strong>Outbound calls active</strong> — toggle off if no outbound today <span class="ob-badge">With Outbound</span>`;
 }
@@ -386,9 +436,28 @@ function renderCovBar(day,fw,barId,alertId){
 }
 
 function buildLegend(){document.getElementById('legend').innerHTML=Object.entries(COLORS).map(([k,v])=>{const short=SHORT_LABELS[k]||'';return`<div class="legend-item"><div class="legend-dot" style="background:${v.bg}"></div><span>${k}${short&&short!==k?` <span style="opacity:0.55;font-size:10px">(${short})</span>`:''}</span></div>`;}).join('');}
-function buildDayBtns(id,ad,afw,df,ff){
-  let h=DAYS.map(d=>`<button class="day-btn ${d===ad?'active':''}" onclick="${df}('${d}')">${d.slice(0,3)}</button>`).join('');
-  if(ad==='Friday'){h+=`<span class="fri-label">Week:</span><div class="fri-toggle">${[1,2,3].map(w=>`<button class="fri-btn ${w===afw?'active':''}" onclick="${ff}(${w})">AH${w}</button>`).join('')}</div>`;}
+function buildDayBtns(id,ad,afw,df,ff,navFn){
+  const mon=getMonday(weekOffset);
+  const fri=new Date(mon);fri.setDate(mon.getDate()+4);
+  const weekLabel=`${mon.toLocaleDateString('en-US',{month:'short',day:'numeric'})} – ${fri.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`;
+  let h=`<div style="display:flex;align-items:center;gap:6px;width:100%;margin-bottom:8px">
+    <button onclick="${navFn}(-1)" style="padding:3px 10px;font-size:13px;border:0.5px solid var(--border-light);border-radius:var(--radius-md);background:transparent;cursor:pointer;font-family:var(--font);color:var(--text-secondary)">‹</button>
+    <span style="font-size:12px;color:var(--text-tertiary);flex:1;text-align:center">${weekLabel}</span>
+    <button onclick="${navFn}(1)" style="padding:3px 10px;font-size:13px;border:0.5px solid var(--border-light);border-radius:var(--radius-md);background:transparent;cursor:pointer;font-family:var(--font);color:var(--text-secondary)">›</button>
+  </div><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">`;
+  h+=DAYS.map(d=>{
+    const today=isToday(d,weekOffset);
+    const active=d===ad;
+    return`<button class="day-btn ${active?'active':''}" onclick="${df}('${d}')" style="${today&&!active?'border-color:var(--border-mid);font-weight:500':''}">
+      ${fmtDayBtn(d,weekOffset)}${today?` <span style="display:inline-block;width:4px;height:4px;border-radius:50%;background:${active?'var(--bg-primary)':'#378ADD'};margin-left:2px;vertical-align:middle"></span>`:''}
+    </button>`;
+  }).join('');
+  if(ad==='Friday'){
+    const friDate=dateOfDay('Friday',weekOffset);
+    const autoFW=getFriWeekForDate(friDate);
+    h+=`<span class="fri-label">Week:</span><div class="fri-toggle">${[1,2,3].map(w=>`<button class="fri-btn ${w===afw?'active':''}" onclick="${ff}(${w})">AH${w}${w===autoFW?' ✓':''}</button>`).join('')}</div>`;
+  }
+  h+=`</div>`;
   document.getElementById(id).innerHTML=h;
 }
 
@@ -645,12 +714,14 @@ function forceApply(){
 }
 
 function renderManager(){
-  buildDayBtns('mgr-days',mDay,mFW,'setMDay','setMFW');updateOBUI();
+  const mDateStr=toISO(dateOfDay(mDay,weekOffset));
+  if(mDay==='Friday') mFW=getFriWeekForDate(dateOfDay('Friday',weekOffset));
+  buildDayBtns('mgr-days',mDay,mFW,'setMDay','setMgrFriWeek','navWeek');updateOBUI();
   renderCovBar(mDay,mFW,'mgr-cov','mgr-alert');
   const wrap=document.getElementById('mgr-timelines');wrap.innerHTML='';
   AGENTS.forEach(a=>{
     const tz=ATZ[a];
-    const isOOO=ooo[a]&&ooo[a][mDay];
+    const isOOO=ooo[a]&&ooo[a][mDateStr];
     const div=document.createElement('div');div.className='agent-row';
     div.innerHTML=`
       <div class="agent-header">
@@ -664,7 +735,7 @@ function renderManager(){
             <span style="font-size:10px;color:var(--text-tertiary)">·</span>
             <span class="tz-pill pst">PST</span>
           </div>
-          <button onclick="toggleOOO('${a}','${mDay}')"
+          <button onclick="toggleOOO('${a}','${mDateStr}')"
             style="font-size:11px;padding:2px 9px;border-radius:20px;cursor:pointer;font-family:var(--font);border:0.5px solid;${isOOO?'background:#EAF3DE;color:#27500A;border-color:#C0DD97':'background:var(--bg-secondary);color:var(--text-tertiary);border-color:var(--border-light)'}">
             ${isOOO?'✓ Back in office':'Mark OOO'}
           </button>
@@ -674,29 +745,34 @@ function renderManager(){
     wrap.appendChild(div);
     renderDualTL(a,mDay,mFW,div.querySelector(`#tl-${a}`));
   });
-  // OOO notice if any agent is out
-  const oooAgents=AGENTS.filter(a=>ooo[a]&&ooo[a][mDay]);
+  const oooAgents=AGENTS.filter(a=>ooo[a]&&ooo[a][mDateStr]);
   if(oooAgents.length>0){
     const notice=document.createElement('div');
     notice.style.cssText='font-size:12px;color:#633806;background:#FAEEDA;border:0.5px solid #FAC775;border-radius:var(--radius-md);padding:8px 14px;margin-bottom:1rem';
-    notice.innerHTML=`<strong>${oooAgents.join(', ')}</strong> ${oooAgents.length>1?'are':'is'} OOO — remaining agents are on simplified inbound-only coverage`;
+    const dateDisp=new Date(mDateStr+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    notice.innerHTML=`<strong>${oooAgents.join(', ')}</strong> ${oooAgents.length>1?'are':'is'} OOO on ${dateDisp} — remaining agents on simplified inbound-only coverage`;
     wrap.insertBefore(notice,wrap.firstChild);
   }
   let ph=0,ob=0,tot=0;
-  AGENTS.forEach(a=>{if(ooo[a]&&ooo[a][mDay])return;gBlocks(a,mDay,mFW).forEach(b=>{const d=t2m(b[2])-t2m(b[1]);if(b[0]==='On Phones')ph+=d;if(b[0]==='Outbound')ob+=d;tot+=d;});});
+  AGENTS.forEach(a=>{if(ooo[a]&&ooo[a][mDateStr])return;gBlocks(a,mDay,mFW).forEach(b=>{const d=t2m(b[2])-t2m(b[1]);if(b[0]==='On Phones')ph+=d;if(b[0]==='Outbound')ob+=d;tot+=d;});});
+  const dateDisp=new Date(mDateStr+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
   document.getElementById('mgr-summary').innerHTML=`
     <div class="sum-card"><div class="sum-lbl">Inbound coverage</div><div class="sum-val">${(ph/60).toFixed(1)}h</div><div class="sum-sub">across working agents</div></div>
-    <div class="sum-card"><div class="sum-lbl">Outbound coverage</div><div class="sum-val">${(ob/60).toFixed(1)}h</div><div class="sum-sub">${mDay!=='Friday'&&noOB[mDay]?'No outbound today':'across working agents'}</div></div>
-    <div class="sum-card"><div class="sum-lbl">Agents working</div><div class="sum-val">${AGENTS.filter(a=>!(ooo[a]&&ooo[a][mDay])).length}</div><div class="sum-sub">of ${AGENTS.length} scheduled</div></div>`;
+    <div class="sum-card"><div class="sum-lbl">Outbound coverage</div><div class="sum-val">${(ob/60).toFixed(1)}h</div><div class="sum-sub">${mDay!=='Friday'&&noOB[mDateStr]?'No outbound today':'across working agents'}</div></div>
+    <div class="sum-card"><div class="sum-lbl">Agents working</div><div class="sum-val">${AGENTS.filter(a=>!(ooo[a]&&ooo[a][mDateStr])).length}</div><div class="sum-sub">of ${AGENTS.length} on ${dateDisp}</div></div>`;
 }
-function setMDay(d){mDay=d;renderManager();}function setMFW(w){mFW=w;renderManager();}
+function setMDay(d){mDay=d;renderManager();}
+function setMgrFriWeek(w){mFW=w;renderManager();}
+function navWeek(dir){weekOffset+=dir;renderAll();}
 
 function renderAgent(){
+  const aDateStr=toISO(dateOfDay(aDay,weekOffset));
+  if(aDay==='Friday') aFW=getFriWeekForDate(dateOfDay('Friday',weekOffset));
   document.getElementById('agent-selector').innerHTML=AGENTS.map(a=>`<button class="agent-btn ${a===aView?'active':''}" onclick="setAV('${a}')">${a}</button>`).join('');
-  buildDayBtns('agent-days',aDay,aFW,'setAD','setAFW');
+  buildDayBtns('agent-days',aDay,aFW,'setAD','setAgentFriWeek','navWeek');
 
-  const isOOO=ooo[aView]&&ooo[aView][aDay];
-  const someoneElseOOO=AGENTS.filter(a=>a!==aView&&ooo[a]&&ooo[a][aDay]);
+  const isOOO=ooo[aView]&&ooo[aView][aDateStr];
+  const someoneElseOOO=AGENTS.filter(a=>a!==aView&&ooo[a]&&ooo[a][aDateStr]);
   const blocks=gBlocks(aView,aDay,aFW),tz=ATZ[aView],tWrap=document.getElementById('agent-tl');
 
   // OOO / simplified schedule banner
@@ -708,7 +784,8 @@ function renderAgent(){
     banner.style.cssText='padding:8px 14px;border-radius:var(--radius-md);font-size:13px;margin-bottom:1rem;border:0.5px solid;';
     if(isOOO){
       banner.style.cssText+='background:#FAEEDA;border-color:#FAC775;color:#633806';
-      banner.innerHTML=`<strong>${aView} is marked OOO on ${aDay}</strong> — schedule shown for reference only`;
+      const dateDisp=new Date(aDateStr+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      banner.innerHTML=`<strong>${aView} is marked OOO on ${dateDisp}</strong> — schedule shown for reference only`;
     } else {
       banner.style.cssText+='background:#EAF3DE;border-color:#C0DD97;color:#27500A';
       banner.innerHTML=`<strong>${someoneElseOOO.join(', ')} ${someoneElseOOO.length>1?'are':'is'} OOO</strong> — showing simplified inbound-only schedule`;
@@ -741,10 +818,13 @@ function renderAgent(){
     return`<div class="block-item" style="${isNow?`border-left:3px solid ${c.bg};`:''}${isOOO?'opacity:0.4':''}"><div><strong>${b[0]}</strong><span style="font-size:12px;color:var(--text-secondary);margin-left:8px">${m2d(s)}–${m2d(e)} <span style="color:#185FA5">${tz}</span></span><span style="font-size:11px;color:var(--text-tertiary);margin-left:6px">${m2d(s+poff*60)}–${m2d(e+poff*60)} PST</span><span style="font-size:11px;color:var(--text-tertiary);margin-left:6px">(${dur}m)</span></div>${isNow?`<span class="badge-now">Now</span>`:''}</div>`;
   }).join('');
 }
-function setAV(a){aView=a;renderAgent();}function setAD(d){aDay=d;renderAgent();}function setAFW(w){aFW=w;renderAgent();}
+function setAV(a){aView=a;renderAgent();}
+function setAD(d){aDay=d;renderAgent();}
+function setAgentFriWeek(w){aFW=w;renderAgent();}
 
 function renderCovTab(){
-  buildDayBtns('cov-days',cDay,cFW,'setCD','setCFW');
+  if(cDay==='Friday') cFW=getFriWeekForDate(dateOfDay('Friday',weekOffset));
+  buildDayBtns('cov-days',cDay,cFW,'setCD','setCovFriWeek','navWeek');
   const{slots,gaps}=getCov(cDay,cFW);
   let h=gaps.length===0
     ?`<div class="alert-box a-ok"><span>✓</span><div><strong>Full coverage confirmed</strong> — at least 1 agent on inbound phones every 15-min slot, 9am–6pm EST.</div></div>`
@@ -753,7 +833,8 @@ function renderCovTab(){
   slots.forEach((c,i)=>{const ss=COV_S+i*15,bg=c===0?'#FCEBEB':c===1?'#EAF3DE':'#B5D4F4',tx=c===0?'#A32D2D':c===1?'#27500A':'#0C447C';h+=`<div class="slot-item" style="background:${bg};color:${tx}"><span style="font-weight:500">${m2d(ss)}</span> <span style="opacity:0.75">${c} agent${c!==1?'s':''}</span></div>`;});
   document.getElementById('cov-detail').innerHTML=h+`</div></div>`;
 }
-function setCD(d){cDay=d;renderCovTab();}function setCFW(w){cFW=w;renderCovTab();}
+function setCD(d){cDay=d;renderCovTab();}
+function setCovFriWeek(w){cFW=w;renderCovTab();}
 
 function clickBlock(agent,day,s,e,act,fw){
   document.getElementById('edit-agent').value=agent;document.getElementById('edit-day').value=day;
@@ -818,8 +899,7 @@ function closeCovModal(){document.getElementById('cov-modal').classList.remove('
 function resetSchedule(){
   if(!confirm('Reset all schedules to the original? This cannot be undone.'))return;
   sched=JSON.parse(JSON.stringify(BASE));fsched=JSON.parse(JSON.stringify(BF));
-  noOB={Monday:false,Tuesday:false,Wednesday:false,Thursday:false};
-  ooo={Ebony:{Monday:false,Tuesday:false,Wednesday:false,Thursday:false,Friday:false},Marisa:{Monday:false,Tuesday:false,Wednesday:false,Thursday:false,Friday:false},Ky:{Monday:false,Tuesday:false,Wednesday:false,Thursday:false,Friday:false}};
+  noOB={};ooo={};AGENTS.forEach(a=>{ooo[a]={};});
   save();renderAll();
 }
 const MANAGER_PIN='0097';
