@@ -127,6 +127,10 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
     <button class="tab" onclick="switchTab('coverage')">Coverage check</button>
   </div>
   <div id="view-manager" class="view active">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+      <div class="save-indicator"><div class="save-dot" id="save-dot"></div><span id="save-text">Loading...</span></div>
+      <button onclick="openCopyModal()" style="font-size:12px;padding:4px 12px;border:0.5px solid var(--border-light);border-radius:var(--radius-md);background:transparent;cursor:pointer;color:var(--text-secondary);font-family:var(--font)">Copy from prev week</button>
+    </div>
     <div class="day-select" id="mgr-days"></div>
     <div class="ob-row" id="ob-row"><div class="ob-label" id="ob-label"></div><label class="toggle-switch"><input type="checkbox" id="ob-toggle" onchange="onOBToggle()"><span class="toggle-slider"></span></label></div>
     <div id="mgr-alert"></div>
@@ -192,6 +196,18 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
     <p style="font-size:13px;color:var(--text-secondary);margin-bottom:1rem" id="redist-desc"></p>
     <div id="redist-agents"></div>
     <div class="btn-row" style="margin-top:1rem"><button class="bp" onclick="confirmRedist()">Apply redistribution</button><button class="bs" onclick="closeRedist()">Skip, just save</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="copy-modal">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-title">Copy from previous week</div>
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:1rem" id="copy-modal-desc"></p>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:1rem" id="copy-day-options"></div>
+    <div class="btn-row">
+      <button class="bp" onclick="confirmCopy()">Copy</button>
+      <button class="bs" onclick="closeCopyModal()">Cancel</button>
+    </div>
   </div>
 </div>
 
@@ -519,14 +535,21 @@ function buildPSTBar(blocks,agent,tz){
   return html;
 }
 
+function getRawBlocks(agent,day,fw){
+  // Raw saved blocks — no OOO/noOB transforms. Used for drag so data-idx matches sched exactly.
+  if(day==='Friday') return fsched[fw]&&fsched[fw][agent]?JSON.parse(JSON.stringify(fsched[fw][agent])):[];
+  return sched[agent]&&sched[agent][day]?JSON.parse(JSON.stringify(sched[agent][day])):[];
+}
+
 function renderDualTL(agent,day,fw,container){
-  const tz=ATZ[agent],blocks=gBlocks(agent,day,fw);
-  if(!blocks.length){container.innerHTML='<p style="font-size:12px;color:var(--text-tertiary)">No blocks</p>';return;}
+  const tz=ATZ[agent];
+  const displayBlocks=gBlocks(agent,day,fw); // transformed (OOO/noOB) — for visual
+  const rawBlocks=getRawBlocks(agent,day,fw); // raw saved — for drag handles
+  if(!displayBlocks.length){container.innerHTML='<p style="font-size:12px;color:var(--text-tertiary)">No blocks</p>';return;}
   container.innerHTML=`<div class="dual-wrap">
-    <div class="tl-row"><div class="tl-tz" style="color:#185FA5">${tz}</div><div class="tl-outer" id="dragbar-wrap-${agent}">${buildDragBar(blocks,agent,day,fw)}</div></div>
-    <div class="tl-row"><div class="tl-tz" style="color:var(--text-tertiary)">PST</div><div class="tl-outer">${buildPSTBar(blocks,agent,tz)}</div></div>
+    <div class="tl-row"><div class="tl-tz" style="color:#185FA5">${tz}</div><div class="tl-outer" id="dragbar-wrap-${agent}">${buildDragBar(rawBlocks,agent,day,fw)}</div></div>
+    <div class="tl-row"><div class="tl-tz" style="color:var(--text-tertiary)">PST</div><div class="tl-outer">${buildPSTBar(displayBlocks,agent,tz)}</div></div>
   </div>`;
-  // Show drag hint tooltip
   container.querySelector('.drag-bar').title='Drag middle to move · Drag right edge to resize';
 }
 
@@ -559,15 +582,17 @@ document.addEventListener('mousedown',e=>{
   const bar=document.getElementById(`dragbar-${agent}`);
   if(!bar)return;
   const rect=bar.getBoundingClientRect();
-  const blocks=gBlocks(agent,day,fw);
+  // Always use raw saved blocks — data-idx in HTML matches sched order exactly
+  const rawBlocks=getRawBlocks(agent,day,fw);
+  if(!rawBlocks.length||idx>=rawBlocks.length)return;
   drag={
     active:true,agent,day,fw,blockIdx:idx,
     mode:handle?'resize':'move',
     startX:e.clientX,barW:rect.width,
     barLeft:rect.left,
-    dayStart:Math.min(...blocks.map(b=>t2m(b[1]))),
-    dayEnd:Math.max(...blocks.map(b=>t2m(b[2]))),
-    origBlocks:JSON.parse(JSON.stringify(blocks)),
+    dayStart:Math.min(...rawBlocks.map(b=>t2m(b[1]))),
+    dayEnd:Math.max(...rawBlocks.map(b=>t2m(b[2]))),
+    origBlocks:JSON.parse(JSON.stringify(rawBlocks)),
   };
   document.body.style.cursor=handle?'ew-resize':'grabbing';
   document.body.style.userSelect='none';
@@ -584,62 +609,114 @@ document.addEventListener('mousemove',e=>{
   const s=t2m(b[1]),en=t2m(b[2]),dur=en-s;
 
   if(mode==='resize'){
-    // Extend/shrink right edge, push/pull next block
+    // Extend/shrink right edge — push next block only for resize
     const newEnd=Math.max(s+15,en+dxMins);
     const delta=newEnd-en;
     b[2]=m2t(newEnd);
-    // Adjust next block if exists
     if(delta!==0&&blockIdx+1<blocks.length){
       const nb=blocks[blockIdx+1];
       const ns=t2m(nb[1]),ne=t2m(nb[2]);
-      const newNs=Math.min(ns+delta,ne-15); // keep min 15min
+      const newNs=Math.min(ns+delta,ne-15);
       nb[1]=m2t(newNs);
       if(t2m(nb[2])<=t2m(nb[1]))nb[2]=m2t(t2m(nb[1])+15);
     }
-    showDragTip(e.clientX,e.clientY,`${b[0]}: ${m2t(t2m(b[1]))} – ${b[2]}`);
+    showDragTip(e.clientX,e.clientY,`${b[0]}: ${m2d(s)} – ${m2d(newEnd)}`);
   } else {
-    // Move block freely anywhere on the timeline
+    // Move block freely — no pushing. Reconstruct timeline:
+    // 1. Remove the dragged block from its original position
+    // 2. Fill the vacated slot with On Phones
+    // 3. Drop the block at the new position (overlapping whatever is there)
+    // 4. Merge any adjacent On Phones blocks
     const newS=Math.max(dayStart,Math.min(dayEnd-dur,s+dxMins));
     const newE=newS+dur;
-    b[1]=m2t(newS);b[2]=m2t(newE);
-    // Compress prev block if it overlaps from the left
-    if(blockIdx>0){
-      const pb=blocks[blockIdx-1];
-      if(t2m(pb[2])>newS) pb[2]=m2t(Math.max(t2m(pb[1])+15,newS));
-    }
-    // Compress next block if it overlaps from the right
-    if(blockIdx+1<blocks.length){
-      const nb=blocks[blockIdx+1];
-      if(t2m(nb[1])<newE) nb[1]=m2t(Math.min(t2m(nb[2])-15,newE));
-    }
+
+    // Start from original blocks minus the dragged one
+    const others=origBlocks.filter((_,i)=>i!==blockIdx);
+
+    // Fill the original slot with On Phones if vacated area not covered
+    others.push(['On Phones',m2t(s),m2t(en)]);
+
+    // Sort all blocks
+    others.sort((a,b)=>t2m(a[1])-t2m(b[1]));
+
+    // Clip any block that overlaps the new position of the dragged block
+    const clipped=[];
+    others.forEach(ob=>{
+      const os=t2m(ob[1]),oe=t2m(ob[2]);
+      // Fully inside dragged block — remove
+      if(os>=newS&&oe<=newE)return;
+      // Overlaps left side — trim right
+      if(os<newS&&oe>newS&&oe<=newE){clipped.push([ob[0],ob[1],m2t(newS)]);return;}
+      // Overlaps right side — trim left
+      if(os>=newS&&os<newE&&oe>newE){clipped.push([ob[0],m2t(newE),ob[2]]);return;}
+      // Spans entire dragged block — split into two
+      if(os<newS&&oe>newE){
+        clipped.push([ob[0],ob[1],m2t(newS)]);
+        clipped.push([ob[0],m2t(newE),ob[2]]);
+        return;
+      }
+      clipped.push(ob);
+    });
+
+    // Add the dragged block at new position
+    clipped.push([b[0],m2t(newS),m2t(newE)]);
+    clipped.sort((a,b)=>t2m(a[1])-t2m(b[1]));
+
+    // Merge adjacent On Phones blocks
+    const merged=mergeOP(clipped);
+
+    // Remove any zero-duration blocks
+    const final=merged.filter(bl=>t2m(bl[2])>t2m(bl[1]));
+
+    // Replace blocks array contents
+    blocks.length=0;
+    final.forEach(bl=>blocks.push(bl));
+    // Restore blockIdx reference to dragged block's new position
+    drag._newBlockIdx=blocks.findIndex(bl=>bl[0]===b[0]&&bl[1]===m2t(newS)&&bl[2]===m2t(newE));
+
     showDragTip(e.clientX,e.clientY,`${b[0]}: ${m2d(newS)} → ${m2d(newE)}`);
   }
 
   // Live re-render drag bar only
   const wrap=document.getElementById(`dragbar-wrap-${agent}`);
   if(wrap){wrap.innerHTML=buildDragBar(blocks,agent,day,fw);}
-  drag._previewBlocks=blocks;
+  drag._previewBlocks=JSON.parse(JSON.stringify(blocks));
 });
 
 document.addEventListener('mouseup',e=>{
   if(!drag.active)return;
   document.body.style.cursor='';document.body.style.userSelect='';hideDragTip();
-  const{agent,day,fw,blockIdx,_previewBlocks,origBlocks}=drag;
+  const{agent,day,fw,blockIdx,_previewBlocks,origBlocks,mode}=drag;
   drag.active=false;
   if(!_previewBlocks){drag={active:false};return;}
 
-  // Check if anything actually changed
-  const orig=origBlocks[blockIdx];
-  const prev=_previewBlocks[blockIdx];
-  if(orig[1]===prev[1]&&orig[2]===prev[2]){drag={active:false};return;}
+  // Check if anything actually changed by comparing block arrays
+  const origStr=JSON.stringify(origBlocks.map(b=>[b[0],b[1],b[2]]));
+  const prevStr=JSON.stringify(_previewBlocks.map(b=>[b[0],b[1],b[2]]));
+  if(origStr===prevStr){drag={active:false};return;}
 
-  // Show confirm modal
+  // For confirm modal: find the dragged block in preview (by activity + new position)
+  const origBlock=origBlocks[blockIdx];
   const tz=ATZ[agent];
-  document.getElementById('drag-confirm-agent').textContent=`${agent} · ${day}${day==='Friday'?' (AH Week '+fw+')':''}`;
-  document.getElementById('drag-confirm-from').textContent=`${prev[0]}: ${m2d(t2m(orig[1]))}–${m2d(t2m(orig[2]))} ${tz}`;
-  document.getElementById('drag-confirm-to').textContent=`${prev[0]}: ${m2d(t2m(prev[1]))}–${m2d(t2m(prev[2]))} ${tz}`;
 
-  // Store for confirm/cancel
+  // For move: show original position → new position of the dragged block
+  // For resize: find same activity block that changed
+  let fromText,toText;
+  if(mode==='move'){
+    // Find the dragged block's new position in preview
+    const newBlock=_previewBlocks.find(b=>b[0]===origBlock[0]&&(b[1]!==origBlock[1]||b[2]!==origBlock[2]));
+    fromText=`${origBlock[0]}: ${m2d(t2m(origBlock[1]))}–${m2d(t2m(origBlock[2]))} ${tz}`;
+    toText=newBlock?`${newBlock[0]}: ${m2d(t2m(newBlock[1]))}–${m2d(t2m(newBlock[2]))} ${tz}`:'(moved)';
+  } else {
+    const prev=_previewBlocks[blockIdx]||_previewBlocks[0];
+    fromText=`${origBlock[0]}: ${m2d(t2m(origBlock[1]))}–${m2d(t2m(origBlock[2]))} ${tz}`;
+    toText=prev?`${prev[0]}: ${m2d(t2m(prev[1]))}–${m2d(t2m(prev[2]))} ${tz}`:'(resized)';
+  }
+
+  document.getElementById('drag-confirm-agent').textContent=`${agent} · ${day}${day==='Friday'?' (AH Week '+fw+')':''}`;
+  document.getElementById('drag-confirm-from').textContent=fromText;
+  document.getElementById('drag-confirm-to').textContent=toText;
+
   drag._pendingBlocks=_previewBlocks;
   drag._pendingAgent=agent;
   drag._pendingDay=day;
@@ -696,8 +773,12 @@ function cancelDrag(){
 }
 
 function applyDragCommit(agent,day,fw,blocks){
-  if(day==='Friday')fsched[fw][agent]=blocks;
-  else sched[agent][day]=blocks;
+  // Sort by start time and remove zero-duration blocks before saving
+  const clean=blocks
+    .filter(b=>t2m(b[2])>t2m(b[1]))
+    .sort((a,b)=>t2m(a[1])-t2m(b[1]));
+  if(day==='Friday')fsched[fw][agent]=clean;
+  else sched[agent][day]=clean;
   save();renderAll();
 }
 
@@ -929,6 +1010,106 @@ function checkPIN(){
 function closePIN(){document.getElementById('pin-modal').classList.remove('open');}
 
 function renderAll(){renderManager();renderAgent();if(document.getElementById('view-coverage').classList.contains('active'))renderCovTab();}
+
+// ── Copy from previous week ───────────────────────────────────
+let copySelection={mode:null,day:null}; // mode: 'day' or 'week'
+
+function openCopyModal(){
+  if(!managerUnlocked){requirePIN('manager');return;}
+  if(weekOffset===0){
+    alert('You are on the current week. Navigate to a future week first, then copy from the previous week.');
+    return;
+  }
+  const prevOffset=weekOffset-1;
+  const prevMon=getMonday(prevOffset);
+  const curMon=getMonday(weekOffset);
+  const prevLabel=prevMon.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  const curLabel=curMon.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+
+  document.getElementById('copy-modal-desc').textContent=
+    `Copy schedule from week of ${prevLabel} into week of ${curLabel}.`;
+
+  // Build day options
+  const optEl=document.getElementById('copy-day-options');
+  let html=`
+    <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-md);border:0.5px solid var(--border-mid);cursor:pointer;font-size:13px">
+      <input type="radio" name="copy-mode" value="week" style="margin:0"> Copy entire week (Mon–Fri)
+    </label>`;
+  DAYS.forEach(d=>{
+    const prevDateStr=toISO(dateOfDay(d,prevOffset));
+    const curDateStr=toISO(dateOfDay(d,weekOffset));
+    html+=`<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-md);border:0.5px solid var(--border-light);cursor:pointer;font-size:13px">
+      <input type="radio" name="copy-mode" value="day-${d}" style="margin:0">
+      ${d} only
+      <span style="font-size:11px;color:var(--text-tertiary);margin-left:auto">${new Date(prevDateStr+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})} → ${new Date(curDateStr+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>
+    </label>`;
+  });
+  optEl.innerHTML=html;
+  // Default select 'week'
+  optEl.querySelector('input[value="week"]').checked=true;
+  document.getElementById('copy-modal').classList.add('open');
+}
+
+function confirmCopy(){
+  const selected=document.querySelector('input[name="copy-mode"]:checked');
+  if(!selected){alert('Please select an option.');return;}
+  const val=selected.value;
+  const prevOffset=weekOffset-1;
+
+  if(val==='week'){
+    // Copy all days Mon–Fri from previous week to current week
+    DAYS.forEach(d=>{
+      if(d==='Friday'){
+        // Copy all 3 Friday variants
+        [1,2,3].forEach(fw=>{
+          AGENTS.forEach(a=>{
+            const src=BF[fw][a]?JSON.parse(JSON.stringify(BF[fw][a])):[];
+            // Check if prev week had custom Friday data (we use base since weeks share same sched)
+            fsched[fw][a]=JSON.parse(JSON.stringify(fsched[fw][a]||BF[fw][a]));
+          });
+        });
+      } else {
+        AGENTS.forEach(a=>{
+          sched[a][d]=JSON.parse(JSON.stringify(sched[a][d]||BASE[a][d]));
+        });
+      }
+    });
+    // Copy noOB and ooo for the week
+    DAYS.forEach(d=>{
+      const prevDateStr=toISO(dateOfDay(d,prevOffset));
+      const curDateStr=toISO(dateOfDay(d,weekOffset));
+      if(noOB[prevDateStr]) noOB[curDateStr]=true;
+      AGENTS.forEach(a=>{
+        if(ooo[a]&&ooo[a][prevDateStr]) ooo[a][curDateStr]=true;
+      });
+    });
+  } else {
+    // Copy single day
+    const day=val.replace('day-','');
+    const prevDateStr=toISO(dateOfDay(day,prevOffset));
+    const curDateStr=toISO(dateOfDay(day,weekOffset));
+    if(day==='Friday'){
+      [1,2,3].forEach(fw=>{
+        AGENTS.forEach(a=>{
+          fsched[fw][a]=JSON.parse(JSON.stringify(fsched[fw][a]||BF[fw][a]));
+        });
+      });
+    } else {
+      AGENTS.forEach(a=>{
+        sched[a][day]=JSON.parse(JSON.stringify(sched[a][day]||BASE[a][day]));
+      });
+    }
+    if(noOB[prevDateStr]) noOB[curDateStr]=true;
+    AGENTS.forEach(a=>{
+      if(ooo[a]&&ooo[a][prevDateStr]) ooo[a][curDateStr]=true;
+    });
+  }
+  closeCopyModal();
+  save();
+  renderAll();
+}
+
+function closeCopyModal(){document.getElementById('copy-modal').classList.remove('open');}
 function switchTab(tab){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
