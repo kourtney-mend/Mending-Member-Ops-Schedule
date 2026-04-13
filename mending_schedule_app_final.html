@@ -195,6 +195,27 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
   </div>
 </div>
 
+<div class="modal-overlay" id="drag-confirm-modal">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-title">Confirm schedule change</div>
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:.75rem" id="drag-confirm-agent"></p>
+    <div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:1rem">
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
+        <span style="color:var(--text-tertiary)">From</span>
+        <span id="drag-confirm-from" style="font-weight:500"></span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:13px">
+        <span style="color:var(--text-tertiary)">To</span>
+        <span id="drag-confirm-to" style="font-weight:500;color:#185FA5"></span>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="bp" onclick="confirmDrag()">Confirm</button>
+      <button class="bs" onclick="cancelDrag()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="cov-modal">
   <div class="modal">
     <div class="modal-title" style="color:#A32D2D">Coverage gap detected</div>
@@ -214,7 +235,7 @@ const ATZ={Ebony:'EST',Marisa:'CST',Ky:'CST'};
 
 const TO_EST={EST:0,CST:1,PST:3};
 const COV_S=540,COV_E=1080;
-const SK='mending-sched-v1',FK='mending-fri-v1',OK='mending-ob-v1';
+const SK='mending-sched-v1',FK='mending-fri-v1',OK='mending-ob-v1',OOK='mending-ooo-v1';
 
 function t2m(t){const[h,m]=t.split(':').map(Number);return h*60+m;}
 function m2t(m){m=((m%1440)+1440)%1440;return`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;}
@@ -231,16 +252,18 @@ tf.setDate(td.getDate()+(td.getDay()===5?0:dtf));
 
 let sched=JSON.parse(JSON.stringify(BASE)),fsched=JSON.parse(JSON.stringify(BF));
 let noOB={Monday:false,Tuesday:false,Wednesday:false,Thursday:false};
+// ooo: {Ebony:{Monday:false,...}, Marisa:{...}, Ky:{...}}
+let ooo={Ebony:{Monday:false,Tuesday:false,Wednesday:false,Thursday:false,Friday:false},Marisa:{Monday:false,Tuesday:false,Wednesday:false,Thursday:false,Friday:false},Ky:{Monday:false,Tuesday:false,Wednesday:false,Thursday:false,Friday:false}};
 let pRed=null,pendingForce=null;
 let mDay='Monday',mFW=gfw(tf),aView='Ebony',aDay='Monday',aFW=gfw(tf),cDay='Monday',cFW=gfw(tf);
 
 function save(){
   setSS('saving');
-  try{localStorage.setItem(SK,JSON.stringify(sched));localStorage.setItem(FK,JSON.stringify(fsched));localStorage.setItem(OK,JSON.stringify(noOB));setSS('saved');}
+  try{localStorage.setItem(SK,JSON.stringify(sched));localStorage.setItem(FK,JSON.stringify(fsched));localStorage.setItem(OK,JSON.stringify(noOB));localStorage.setItem(OOK,JSON.stringify(ooo));setSS('saved');}
   catch(e){setSS('error');}
 }
 function load(){
-  try{const s=localStorage.getItem(SK),f=localStorage.getItem(FK),o=localStorage.getItem(OK);if(s)sched=JSON.parse(s);if(f)fsched=JSON.parse(f);if(o)noOB=JSON.parse(o);setSS('saved');}
+  try{const s=localStorage.getItem(SK),f=localStorage.getItem(FK),o=localStorage.getItem(OK),oo=localStorage.getItem(OOK);if(s)sched=JSON.parse(s);if(f)fsched=JSON.parse(f);if(o)noOB=JSON.parse(o);if(oo)ooo=JSON.parse(oo);setSS('saved');}
   catch(e){setSS('saved');}
   renderAll();
 }
@@ -250,10 +273,46 @@ function setSS(st){
   const[c,l]=m[st]||m.saved;if(dot)dot.style.background=c;if(txt)txt.textContent=l;
 }
 
+// ── OOO helpers ──────────────────────────────────────────────
+const OOO_KEEP=['Break 1','Break 2','Lunch','Ticket Time','All Hands'];
+
+// Generate simplified schedule for an agent covering for OOO colleague(s)
+// Keeps their break/lunch/ticket blocks, replaces everything else with On Phones
+function applyOOOCoverage(blocks){
+  if(!blocks.length)return blocks;
+  const dayStart=Math.min(...blocks.map(b=>t2m(b[1])));
+  const dayEnd=Math.max(...blocks.map(b=>t2m(b[2])));
+  const kept=blocks.filter(b=>OOO_KEEP.includes(b[0])).sort((a,b)=>t2m(a[1])-t2m(b[1]));
+  const result=[];
+  let cursor=dayStart;
+  kept.forEach(b=>{
+    const bs=t2m(b[1]),be=t2m(b[2]);
+    if(cursor<bs)result.push(['On Phones',m2t(cursor),m2t(bs)]);
+    result.push(b);
+    cursor=be;
+  });
+  if(cursor<dayEnd)result.push(['On Phones',m2t(cursor),m2t(dayEnd)]);
+  return result;
+}
+
+function toggleOOO(agent,day){
+  if(!managerUnlocked){requirePIN('manager');return;}
+  ooo[agent][day]=!ooo[agent][day];
+  save();renderAll();
+}
+
 function gBlocks(agent,day,fw,tS,tF){
-  let b=day==='Friday'?(tF||fsched)[fw][agent]||[]:(tS||sched)[agent][day]||[];
-  if(day!=='Friday'&&noOB[day]){b=mergeOP(b.map(x=>x[0]==='Outbound'?['On Phones',x[1],x[2]]:x));}
-  return b;
+  let blocks=day==='Friday'?(tF||fsched)[fw][agent]||[]:(tS||sched)[agent][day]||[];
+  // Apply no-outbound mode for weekdays
+  if(day!=='Friday'&&noOB[day]){
+    blocks=mergeOP(blocks.map(x=>x[0]==='Outbound'?['On Phones',x[1],x[2]]:x));
+  }
+  // If this agent is OOO, return their blocks as-is (shown greyed)
+  if(ooo[agent]&&ooo[agent][day]) return blocks;
+  // If any OTHER agent is OOO today, apply simplified coverage for this agent
+  const someoneOOO=AGENTS.filter(a=>a!==agent&&ooo[a]&&ooo[a][day]).length>0;
+  if(someoneOOO) return applyOOOCoverage(blocks);
+  return blocks;
 }
 function mergeOP(b){
   if(!b.length)return b;
@@ -415,6 +474,15 @@ document.addEventListener('mousedown',e=>{
   const handle=e.target.closest('.drag-handle-right');
   const block=e.target.closest('.drag-block');
   if(!handle&&!block)return;
+  // Require PIN to drag
+  if(!managerUnlocked){
+    e.preventDefault();
+    document.getElementById('pin-input').value='';
+    document.getElementById('pin-error').textContent='';
+    document.getElementById('pin-modal').classList.add('open');
+    setTimeout(()=>document.getElementById('pin-input').focus(),100);
+    return;
+  }
   const el=handle||block;
   const agent=el.dataset.agent,day=el.dataset.day,fw=parseInt(el.dataset.fw),idx=parseInt(el.dataset.idx);
   if(!agent)return;
@@ -461,15 +529,21 @@ document.addEventListener('mousemove',e=>{
     }
     showDragTip(e.clientX,e.clientY,`${b[0]}: ${m2t(t2m(b[1]))} – ${b[2]}`);
   } else {
-    // Move block, push neighbours
+    // Move block freely anywhere on the timeline
     const newS=Math.max(dayStart,Math.min(dayEnd-dur,s+dxMins));
     const newE=newS+dur;
     b[1]=m2t(newS);b[2]=m2t(newE);
-    // Push prev block left if overlap
-    if(blockIdx>0){const pb=blocks[blockIdx-1];if(t2m(pb[2])>newS)pb[2]=m2t(Math.max(t2m(pb[1])+15,newS));}
-    // Push next block right if overlap
-    if(blockIdx+1<blocks.length){const nb=blocks[blockIdx+1];if(t2m(nb[1])<newE)nb[1]=m2t(Math.min(t2m(nb[2])-15,newE));}
-    showDragTip(e.clientX,e.clientY,`${b[0]}: ${m2d(newS)} – ${m2d(newE)}`);
+    // Compress prev block if it overlaps from the left
+    if(blockIdx>0){
+      const pb=blocks[blockIdx-1];
+      if(t2m(pb[2])>newS) pb[2]=m2t(Math.max(t2m(pb[1])+15,newS));
+    }
+    // Compress next block if it overlaps from the right
+    if(blockIdx+1<blocks.length){
+      const nb=blocks[blockIdx+1];
+      if(t2m(nb[1])<newE) nb[1]=m2t(Math.min(t2m(nb[2])-15,newE));
+    }
+    showDragTip(e.clientX,e.clientY,`${b[0]}: ${m2d(newS)} → ${m2d(newE)}`);
   }
 
   // Live re-render drag bar only
@@ -481,26 +555,28 @@ document.addEventListener('mousemove',e=>{
 document.addEventListener('mouseup',e=>{
   if(!drag.active)return;
   document.body.style.cursor='';document.body.style.userSelect='';hideDragTip();
-  const{agent,day,fw,_previewBlocks}=drag;
+  const{agent,day,fw,blockIdx,_previewBlocks,origBlocks}=drag;
   drag.active=false;
   if(!_previewBlocks){drag={active:false};return;}
 
-  // Coverage check on proposed state
-  const testS=JSON.parse(JSON.stringify(sched));
-  const testF=JSON.parse(JSON.stringify(fsched));
-  if(day==='Friday')testF[fw][agent]=_previewBlocks;
-  else testS[agent][day]=_previewBlocks;
-  const{gaps}=getCov(day,fw,testS,testF);
+  // Check if anything actually changed
+  const orig=origBlocks[blockIdx];
+  const prev=_previewBlocks[blockIdx];
+  if(orig[1]===prev[1]&&orig[2]===prev[2]){drag={active:false};return;}
 
-  if(gaps.length>0){
-    document.getElementById('cov-modal-desc').textContent=`This change would create inbound coverage gaps on ${day}${day==='Friday'?' (AH Week '+fw+')':''}:`;
-    document.getElementById('cov-modal-gaps').innerHTML=fmtGaps(gaps).map(g=>`<span class="gap-pill">${g}</span>`).join('');
-    // Store for force apply
-    pendingForce={dragBlocks:_previewBlocks,agent,day,fw};
-    document.getElementById('cov-modal').classList.add('open');
-  } else {
-    applyDragCommit(agent,day,fw,_previewBlocks);
-  }
+  // Show confirm modal
+  const tz=ATZ[agent];
+  document.getElementById('drag-confirm-agent').textContent=`${agent} · ${day}${day==='Friday'?' (AH Week '+fw+')':''}`;
+  document.getElementById('drag-confirm-from').textContent=`${prev[0]}: ${m2d(t2m(orig[1]))}–${m2d(t2m(orig[2]))} ${tz}`;
+  document.getElementById('drag-confirm-to').textContent=`${prev[0]}: ${m2d(t2m(prev[1]))}–${m2d(t2m(prev[2]))} ${tz}`;
+
+  // Store for confirm/cancel
+  drag._pendingBlocks=_previewBlocks;
+  drag._pendingAgent=agent;
+  drag._pendingDay=day;
+  drag._pendingFw=fw;
+  drag._origBlocks=origBlocks;
+  document.getElementById('drag-confirm-modal').classList.add('open');
   drag={active:false};
 });
 
@@ -519,6 +595,36 @@ document.addEventListener('touchmove',e=>{
 document.addEventListener('touchend',e=>{
   document.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));
 });
+
+function confirmDrag(){
+  document.getElementById('drag-confirm-modal').classList.remove('open');
+  const{_pendingBlocks,_pendingAgent,_pendingDay,_pendingFw}=drag;
+  if(!_pendingBlocks)return;
+
+  // Coverage check
+  const testS=JSON.parse(JSON.stringify(sched));
+  const testF=JSON.parse(JSON.stringify(fsched));
+  if(_pendingDay==='Friday')testF[_pendingFw][_pendingAgent]=_pendingBlocks;
+  else testS[_pendingAgent][_pendingDay]=_pendingBlocks;
+  const{gaps}=getCov(_pendingDay,_pendingFw,testS,testF);
+
+  if(gaps.length>0){
+    document.getElementById('cov-modal-desc').textContent=`This change would create inbound coverage gaps on ${_pendingDay}${_pendingDay==='Friday'?' (AH Week '+_pendingFw+')':''}:`;
+    document.getElementById('cov-modal-gaps').innerHTML=fmtGaps(gaps).map(g=>`<span class="gap-pill">${g}</span>`).join('');
+    pendingForce={dragBlocks:_pendingBlocks,agent:_pendingAgent,day:_pendingDay,fw:_pendingFw};
+    document.getElementById('cov-modal').classList.add('open');
+  } else {
+    applyDragCommit(_pendingAgent,_pendingDay,_pendingFw,_pendingBlocks);
+  }
+  drag={active:false};
+}
+
+function cancelDrag(){
+  document.getElementById('drag-confirm-modal').classList.remove('open');
+  // Re-render to restore original state visually
+  renderManager();
+  drag={active:false};
+}
 
 function applyDragCommit(agent,day,fw,blocks){
   if(day==='Friday')fsched[fw][agent]=blocks;
@@ -543,28 +649,78 @@ function renderManager(){
   renderCovBar(mDay,mFW,'mgr-cov','mgr-alert');
   const wrap=document.getElementById('mgr-timelines');wrap.innerHTML='';
   AGENTS.forEach(a=>{
-    const tz=ATZ[a],div=document.createElement('div');div.className='agent-row';
-    div.innerHTML=`<div class="agent-header"><div class="agent-name">${a}</div><div class="tz-pills"><span class="tz-pill agent">${tz}</span><span style="font-size:10px;color:var(--text-tertiary)">·</span><span class="tz-pill pst">PST</span></div></div><div id="tl-${a}"></div>`;
-    wrap.appendChild(div);renderDualTL(a,mDay,mFW,div.querySelector(`#tl-${a}`));
+    const tz=ATZ[a];
+    const isOOO=ooo[a]&&ooo[a][mDay];
+    const div=document.createElement('div');div.className='agent-row';
+    div.innerHTML=`
+      <div class="agent-header">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="agent-name" style="${isOOO?'opacity:0.4;text-decoration:line-through':''}">${a}</div>
+          ${isOOO?`<span style="font-size:10px;background:#FAEEDA;color:#633806;border:0.5px solid #FAC775;padding:1px 7px;border-radius:20px;font-weight:500">OOO</span>`:''}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="tz-pills">
+            <span class="tz-pill agent">${tz}</span>
+            <span style="font-size:10px;color:var(--text-tertiary)">·</span>
+            <span class="tz-pill pst">PST</span>
+          </div>
+          <button onclick="toggleOOO('${a}','${mDay}')"
+            style="font-size:11px;padding:2px 9px;border-radius:20px;cursor:pointer;font-family:var(--font);border:0.5px solid;${isOOO?'background:#EAF3DE;color:#27500A;border-color:#C0DD97':'background:var(--bg-secondary);color:var(--text-tertiary);border-color:var(--border-light)'}">
+            ${isOOO?'✓ Back in office':'Mark OOO'}
+          </button>
+        </div>
+      </div>
+      <div id="tl-${a}" style="${isOOO?'opacity:0.35;pointer-events:none':''}"></div>`;
+    wrap.appendChild(div);
+    renderDualTL(a,mDay,mFW,div.querySelector(`#tl-${a}`));
   });
+  // OOO notice if any agent is out
+  const oooAgents=AGENTS.filter(a=>ooo[a]&&ooo[a][mDay]);
+  if(oooAgents.length>0){
+    const notice=document.createElement('div');
+    notice.style.cssText='font-size:12px;color:#633806;background:#FAEEDA;border:0.5px solid #FAC775;border-radius:var(--radius-md);padding:8px 14px;margin-bottom:1rem';
+    notice.innerHTML=`<strong>${oooAgents.join(', ')}</strong> ${oooAgents.length>1?'are':'is'} OOO — remaining agents are on simplified inbound-only coverage`;
+    wrap.insertBefore(notice,wrap.firstChild);
+  }
   let ph=0,ob=0,tot=0;
-  AGENTS.forEach(a=>{gBlocks(a,mDay,mFW).forEach(b=>{const d=t2m(b[2])-t2m(b[1]);if(b[0]==='On Phones')ph+=d;if(b[0]==='Outbound')ob+=d;tot+=d;});});
+  AGENTS.forEach(a=>{if(ooo[a]&&ooo[a][mDay])return;gBlocks(a,mDay,mFW).forEach(b=>{const d=t2m(b[2])-t2m(b[1]);if(b[0]==='On Phones')ph+=d;if(b[0]==='Outbound')ob+=d;tot+=d;});});
   document.getElementById('mgr-summary').innerHTML=`
-    <div class="sum-card"><div class="sum-lbl">Inbound coverage</div><div class="sum-val">${(ph/60).toFixed(1)}h</div><div class="sum-sub">across all agents</div></div>
-    <div class="sum-card"><div class="sum-lbl">Outbound coverage</div><div class="sum-val">${(ob/60).toFixed(1)}h</div><div class="sum-sub">${mDay!=='Friday'&&noOB[mDay]?'No outbound today':'across all agents'}</div></div>
-    <div class="sum-card"><div class="sum-lbl">Avg per agent</div><div class="sum-val">${(tot/3/60).toFixed(1)}h</div><div class="sum-sub">scheduled today</div></div>`;
+    <div class="sum-card"><div class="sum-lbl">Inbound coverage</div><div class="sum-val">${(ph/60).toFixed(1)}h</div><div class="sum-sub">across working agents</div></div>
+    <div class="sum-card"><div class="sum-lbl">Outbound coverage</div><div class="sum-val">${(ob/60).toFixed(1)}h</div><div class="sum-sub">${mDay!=='Friday'&&noOB[mDay]?'No outbound today':'across working agents'}</div></div>
+    <div class="sum-card"><div class="sum-lbl">Agents working</div><div class="sum-val">${AGENTS.filter(a=>!(ooo[a]&&ooo[a][mDay])).length}</div><div class="sum-sub">of ${AGENTS.length} scheduled</div></div>`;
 }
 function setMDay(d){mDay=d;renderManager();}function setMFW(w){mFW=w;renderManager();}
 
 function renderAgent(){
   document.getElementById('agent-selector').innerHTML=AGENTS.map(a=>`<button class="agent-btn ${a===aView?'active':''}" onclick="setAV('${a}')">${a}</button>`).join('');
   buildDayBtns('agent-days',aDay,aFW,'setAD','setAFW');
+
+  const isOOO=ooo[aView]&&ooo[aView][aDay];
+  const someoneElseOOO=AGENTS.filter(a=>a!==aView&&ooo[a]&&ooo[a][aDay]);
   const blocks=gBlocks(aView,aDay,aFW),tz=ATZ[aView],tWrap=document.getElementById('agent-tl');
+
+  // OOO / simplified schedule banner
+  const statusBanner=document.getElementById('agent-ooo-banner');
+  if(statusBanner) statusBanner.remove();
+  if(isOOO||someoneElseOOO.length>0){
+    const banner=document.createElement('div');
+    banner.id='agent-ooo-banner';
+    banner.style.cssText='padding:8px 14px;border-radius:var(--radius-md);font-size:13px;margin-bottom:1rem;border:0.5px solid;';
+    if(isOOO){
+      banner.style.cssText+='background:#FAEEDA;border-color:#FAC775;color:#633806';
+      banner.innerHTML=`<strong>${aView} is marked OOO on ${aDay}</strong> — schedule shown for reference only`;
+    } else {
+      banner.style.cssText+='background:#EAF3DE;border-color:#C0DD97;color:#27500A';
+      banner.innerHTML=`<strong>${someoneElseOOO.join(', ')} ${someoneElseOOO.length>1?'are':'is'} OOO</strong> — showing simplified inbound-only schedule`;
+    }
+    tWrap.parentNode.insertBefore(banner,tWrap);
+  }
+
   if(!blocks.length){tWrap.innerHTML='<p style="font-size:12px;color:var(--text-tertiary)">No blocks</p>';}
   else{
     const bS=Math.min(...blocks.map(b=>t2m(b[1]))),bE=Math.max(...blocks.map(b=>t2m(b[2]))),tot=bE-bS;
     const nowM=nowFor(tz),inDay=nowM>=bS&&nowM<=bE;
-    let h=`<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-tertiary);margin-bottom:2px"><span>${m2d(bS)} <span style="opacity:0.6">${tz}</span></span><span>${m2d(bE)} <span style="opacity:0.6">${tz}</span></span></div><div class="tl-bar" style="height:42px">`;
+    let h=`<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-tertiary);margin-bottom:2px"><span>${m2d(bS)} <span style="opacity:0.6">${tz}</span></span><span>${m2d(bE)} <span style="opacity:0.6">${tz}</span></span></div><div class="tl-bar" style="height:42px;${isOOO?'opacity:0.4':''}">`;
     blocks.forEach(b=>{const s=t2m(b[1]),e=t2m(b[2]),w=((e-s)/tot*100).toFixed(2),c=COLORS[b[0]]||{bg:'#D3D1C7',text:'#444441'},lbl=getLabel(b[0],parseFloat(w));h+=`<div class="tl-block" style="width:${w}%;background:${c.bg};color:${c.text};font-size:10px" title="${b[0]}: ${m2d(s)}–${m2d(e)} ${tz}" onclick="clickBlock('${aView}','${aDay}',${s},${e},'${b[0]}',${aFW})"><span style="pointer-events:none;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%;display:block;text-align:center">${lbl}</span></div>`;});
     if(inDay){const pct=((nowM-bS)/tot*100).toFixed(2);h+=`<div class="now-line" style="left:${pct}%"><span class="now-lbl">now</span></div>`;}
     tWrap.innerHTML=h+`</div>`;
@@ -572,13 +728,17 @@ function renderAgent(){
   const nowM=nowFor(ATZ[aView]);let cur=null,nxt=null;
   blocks.forEach(b=>{const s=t2m(b[1]),e=t2m(b[2]);if(nowM>=s&&nowM<e)cur=b;if(!nxt&&s>nowM)nxt=b;});
   const se=document.getElementById('agent-status');
-  if(cur){const c=COLORS[cur[0]]||{bg:'#D3D1C7',text:'#444441'};se.innerHTML=`<span style="font-size:11px;color:var(--text-tertiary)">Right now (${tz})</span><br><strong style="font-size:15px;color:${c.text}">${cur[0]}</strong> until ${m2d(t2m(cur[2]))}${nxt?` &nbsp;·&nbsp; Next: <strong>${nxt[0]}</strong> at ${m2d(t2m(nxt[1]))}`:''}`;
-  }else{se.innerHTML=`<span style="color:var(--text-tertiary)">Shift not currently active (${tz})</span>${nxt?` — next: <strong>${nxt[0]}</strong> at ${m2d(t2m(nxt[1]))}`:''}`;
+  if(isOOO){
+    se.innerHTML=`<span style="color:#633806">🏖 ${aView} is out of office on ${aDay}</span>`;
+  } else if(cur){
+    const c=COLORS[cur[0]]||{bg:'#D3D1C7',text:'#444441'};se.innerHTML=`<span style="font-size:11px;color:var(--text-tertiary)">Right now (${tz})</span><br><strong style="font-size:15px;color:${c.text}">${cur[0]}</strong> until ${m2d(t2m(cur[2]))}${nxt?` &nbsp;·&nbsp; Next: <strong>${nxt[0]}</strong> at ${m2d(t2m(nxt[1]))}`:''}`;
+  }else{
+    se.innerHTML=`<span style="color:var(--text-tertiary)">Shift not currently active (${tz})</span>${nxt?` — next: <strong>${nxt[0]}</strong> at ${m2d(t2m(nxt[1]))}`:''}`;
   }
   const poff=getTZOffsetMins('PST')-getTZOffsetMins(ATZ[aView]);
   document.getElementById('agent-blocks').innerHTML=blocks.map(b=>{
     const s=t2m(b[1]),e=t2m(b[2]),dur=e-s,isNow=nowM>=s&&nowM<e,c=COLORS[b[0]]||{bg:'#D3D1C7',text:'#444441'};
-    return`<div class="block-item" style="${isNow?`border-left:3px solid ${c.bg};`:''}"><div><strong>${b[0]}</strong><span style="font-size:12px;color:var(--text-secondary);margin-left:8px">${m2d(s)}–${m2d(e)} <span style="color:#185FA5">${tz}</span></span><span style="font-size:11px;color:var(--text-tertiary);margin-left:6px">${m2d(s+poff*60)}–${m2d(e+poff*60)} PST</span><span style="font-size:11px;color:var(--text-tertiary);margin-left:6px">(${dur}m)</span></div>${isNow?`<span class="badge-now">Now</span>`:''}</div>`;
+    return`<div class="block-item" style="${isNow?`border-left:3px solid ${c.bg};`:''}${isOOO?'opacity:0.4':''}"><div><strong>${b[0]}</strong><span style="font-size:12px;color:var(--text-secondary);margin-left:8px">${m2d(s)}–${m2d(e)} <span style="color:#185FA5">${tz}</span></span><span style="font-size:11px;color:var(--text-tertiary);margin-left:6px">${m2d(s+poff*60)}–${m2d(e+poff*60)} PST</span><span style="font-size:11px;color:var(--text-tertiary);margin-left:6px">(${dur}m)</span></div>${isNow?`<span class="badge-now">Now</span>`:''}</div>`;
   }).join('');
 }
 function setAV(a){aView=a;renderAgent();}function setAD(d){aDay=d;renderAgent();}function setAFW(w){aFW=w;renderAgent();}
@@ -658,7 +818,9 @@ function closeCovModal(){document.getElementById('cov-modal').classList.remove('
 function resetSchedule(){
   if(!confirm('Reset all schedules to the original? This cannot be undone.'))return;
   sched=JSON.parse(JSON.stringify(BASE));fsched=JSON.parse(JSON.stringify(BF));
-  noOB={Monday:false,Tuesday:false,Wednesday:false,Thursday:false};save();renderAll();
+  noOB={Monday:false,Tuesday:false,Wednesday:false,Thursday:false};
+  ooo={Ebony:{Monday:false,Tuesday:false,Wednesday:false,Thursday:false,Friday:false},Marisa:{Monday:false,Tuesday:false,Wednesday:false,Thursday:false,Friday:false},Ky:{Monday:false,Tuesday:false,Wednesday:false,Thursday:false,Friday:false}};
+  save();renderAll();
 }
 const MANAGER_PIN='0097';
 let managerUnlocked=false;
