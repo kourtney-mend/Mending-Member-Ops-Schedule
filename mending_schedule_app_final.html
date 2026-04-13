@@ -156,6 +156,7 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
         <div><label>Activity</label><select id="edit-activity"></select></div>
       </div>
       <div class="form-row"><div><label>New start time</label><input type="time" id="edit-start"></div><div><label>New end time</label><input type="time" id="edit-end"></div></div>
+      <input type="hidden" id="edit-orig-start">
       <div id="edit-fri-row" style="display:none;margin-bottom:10px"><label>Friday week</label><select id="edit-fri-week"><option value="1">AH Week 1</option><option value="2">AH Week 2</option><option value="3">AH Week 3</option></select></div>
       <div class="btn-row"><button class="bp" onclick="applyEdit()">Apply change</button><button class="bs" onclick="resetSchedule()">Reset to original</button></div>
     </div>
@@ -788,8 +789,8 @@ function forceApply(){
   if(pendingForce.dragBlocks){
     applyDragCommit(pendingForce.agent,pendingForce.day,pendingForce.fw,pendingForce.dragBlocks);
   } else {
-    const{agent,day,act,ns,ne,fw,delta}=pendingForce;
-    commitEdit(agent,day,act,ns,ne,fw,delta);
+    const{agent,day,act,ns,ne,fw,delta,origStart}=pendingForce;
+    commitEdit(agent,day,act,ns,ne,fw,delta,origStart);
   }
   pendingForce=null;
 }
@@ -918,10 +919,16 @@ function setCD(d){cDay=d;renderCovTab();}
 function setCovFriWeek(w){cFW=w;renderCovTab();}
 
 function clickBlock(agent,day,s,e,act,fw){
-  document.getElementById('edit-agent').value=agent;document.getElementById('edit-day').value=day;
-  document.getElementById('edit-activity').value=act;document.getElementById('edit-start').value=m2t(s);
-  document.getElementById('edit-end').value=m2t(e);document.getElementById('edit-fri-week').value=fw;
-  document.getElementById('edit-fri-row').style.display=day==='Friday'?'block':'none';switchTab('edit');
+  // s and e come from the drag bar which uses getRawBlocks — correct
+  document.getElementById('edit-agent').value=agent;
+  document.getElementById('edit-day').value=day;
+  document.getElementById('edit-activity').value=act;
+  document.getElementById('edit-start').value=m2t(s);
+  document.getElementById('edit-end').value=m2t(e);
+  document.getElementById('edit-orig-start').value=m2t(s); // store original start for matching
+  document.getElementById('edit-fri-week').value=fw;
+  document.getElementById('edit-fri-row').style.display=day==='Friday'?'block':'none';
+  switchTab('edit');
 }
 function onEditDayChange(){document.getElementById('edit-fri-row').style.display=document.getElementById('edit-day').value==='Friday'?'block':'none';}
 function onAddDayChange(){document.getElementById('add-fri-row').style.display=document.getElementById('add-day').value==='Friday'?'block':'none';}
@@ -932,24 +939,32 @@ function populateSelects(){
 function applyEdit(){
   const agent=document.getElementById('edit-agent').value,day=document.getElementById('edit-day').value,act=document.getElementById('edit-activity').value;
   const ns=document.getElementById('edit-start').value,ne=document.getElementById('edit-end').value;
+  const origStart=document.getElementById('edit-orig-start').value; // original start to match correct block
   if(!ns||!ne){alert('Please fill in start and end times.');return;}
   const fw=parseInt(document.getElementById('edit-fri-week').value);
   const tS=JSON.parse(JSON.stringify(sched)),tF=JSON.parse(JSON.stringify(fsched));
   const blocks=day==='Friday'?tF[fw][agent]:tS[agent][day];
-  const idx=blocks.findIndex(b=>b[0]===act);if(idx===-1){alert('Block not found. Try adding it instead.');return;}
+  // Match by activity + original start time for precision
+  let idx=blocks.findIndex(b=>b[0]===act&&b[1]===origStart);
+  if(idx===-1) idx=blocks.findIndex(b=>b[0]===act); // fallback
+  if(idx===-1){alert('Block not found. Try adding it instead.');return;}
   const oldD=t2m(blocks[idx][2])-t2m(blocks[idx][1]);blocks[idx]=[act,ns,ne];
   const delta=t2m(ne)-t2m(ns)-oldD;
   const{gaps}=getCov(day,fw,tS,tF);
   if(gaps.length>0){
     document.getElementById('cov-modal-desc').textContent=`Changing ${agent}'s ${act} on ${day}${day==='Friday'?' (AH Week '+fw+')':''} would create inbound coverage gaps:`;
     document.getElementById('cov-modal-gaps').innerHTML=fmtGaps(gaps).map(g=>`<span class="gap-pill">${g}</span>`).join('');
-    pendingForce={agent,day,act,ns,ne,fw,delta};document.getElementById('cov-modal').classList.add('open');
-  }else{commitEdit(agent,day,act,ns,ne,fw,delta);}
+    pendingForce={agent,day,act,ns,ne,fw,delta,origStart};document.getElementById('cov-modal').classList.add('open');
+  }else{commitEdit(agent,day,act,ns,ne,fw,delta,origStart);}
 }
 function _unusedForceApply(){}
-function commitEdit(agent,day,act,ns,ne,fw,delta){
+function commitEdit(agent,day,act,ns,ne,fw,delta,origStart){
   const blocks=day==='Friday'?fsched[fw][agent]:sched[agent][day];
-  const idx=blocks.findIndex(b=>b[0]===act);if(idx>-1)blocks[idx]=[act,ns,ne];
+  let idx=origStart?blocks.findIndex(b=>b[0]===act&&b[1]===origStart):-1;
+  if(idx===-1) idx=blocks.findIndex(b=>b[0]===act);
+  if(idx>-1)blocks[idx]=[act,ns,ne];
+  // Sort after edit
+  blocks.sort((a,b)=>t2m(a[1])-t2m(b[1]));
   if(delta!==0)showRedistModal(agent,day,act,delta,fw);else{save();renderAll();}
 }
 function addBlock(){
