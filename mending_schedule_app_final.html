@@ -531,7 +531,7 @@ function applyOOOCoverage(blocks){
 }
 
 function toggleOOO(agent,dateStr){
-  if(!managerUnlocked){requirePIN('manager');return;}
+  if(!managerUnlocked){requirePIN('manager',()=>toggleOOO(agent,dateStr));return;}
   if(!ooo[agent])ooo[agent]={};
   ooo[agent][dateStr]=!ooo[agent][dateStr];
   save();renderAll();
@@ -574,7 +574,7 @@ function mergeOP(b){
   m.push(c);return m;
 }
 function toggleAgentOB(agent,dateStr){
-  if(!managerUnlocked){requirePIN('manager');return;}
+  if(!managerUnlocked){requirePIN('manager',()=>toggleAgentOB(agent,dateStr));return;}
   if(!noOB[dateStr]) noOB[dateStr]={};
   noOB[dateStr][agent]=!noOB[dateStr][agent];
   save();renderAll();
@@ -1353,11 +1353,17 @@ function resetSchedule(){
 }
 const MANAGER_PIN='0097';
 let managerUnlocked=false;
-
 let pinTargetTab='edit';
-function requirePIN(tab){
-  if(managerUnlocked){switchTab(tab);return;}
+let pinCallback=null; // action to run after PIN unlock
+
+function requirePIN(tab,callback){
+  if(managerUnlocked){
+    if(callback) callback();
+    else switchTab(tab);
+    return;
+  }
   pinTargetTab=tab;
+  pinCallback=callback||null;
   document.getElementById('pin-input').value='';
   document.getElementById('pin-error').textContent='';
   document.getElementById('pin-modal').classList.add('open');
@@ -1368,7 +1374,12 @@ function checkPIN(){
   if(entered===MANAGER_PIN){
     managerUnlocked=true;
     closePIN();
-    switchTab(pinTargetTab);
+    if(pinCallback){
+      pinCallback();
+      pinCallback=null;
+    } else {
+      switchTab(pinTargetTab);
+    }
     // Update locked tab labels to show unlocked
     ['edit','builder'].forEach(t=>{
       const el=document.querySelector(`.tab[onclick="requirePIN('${t}')"]`);
@@ -1587,7 +1598,7 @@ function execCopyFromDate(){
 let bam={}; // current block being acted on: {agent,day,fw,idx,block}
 
 function openAddBlock(e,agent,day,fw){
-  if(!managerUnlocked) return;
+  if(!managerUnlocked){requirePIN('manager',()=>openAddBlock(e,agent,day,fw));return;}
   e.stopPropagation();
   bam={agent,day,fw,idx:-1,block:null};
   const tz=ATZ[agent];
@@ -1628,9 +1639,8 @@ function bamSaveAdd(){
 }
 
 function openBlockAction(e,agent,day,fw,idx){
-  // Don't open if this was a drag start — check if mouse moved
   if(drag._wasDrag){drag._wasDrag=false;return;}
-  if(!managerUnlocked) return; // PIN required — mousedown will handle prompting
+  if(!managerUnlocked){requirePIN('manager',()=>openBlockAction(e,agent,day,fw,idx));return;}
   e.stopPropagation();
   const blocks=getRawBlocks(agent,day,fw);
   if(idx>=blocks.length) return;
