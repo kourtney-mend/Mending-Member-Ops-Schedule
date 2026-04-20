@@ -1689,7 +1689,8 @@ function renderAgent(){
   document.getElementById('agent-selector').innerHTML=AGENTS.map(a=>`<button class="agent-btn ${a===aView?'active':''}" onclick="setAV('${a}')">${a}</button>`).join('');
   buildDayBtns('agent-days',aDay,aFW,'setAD','setAgentFriWeek','navWeek');
 
-  const isOOO=ooo[aView]&&ooo[aView][aDateStr];
+  const isOOO=ooo[aView]&&ooo[aView][aDateStr]===true; // full day only
+  const isPartialOOO=ooo[aView]&&ooo[aView][aDateStr]&&typeof ooo[aView][aDateStr]==='object';
   const someoneElseOOO=AGENTS.filter(a=>a!==aView&&ooo[a]&&ooo[a][aDateStr]);
   const blocks=gBlocks(aView,aDay,aFW),tz=ATZ[aView],tWrap=document.getElementById('agent-tl');
 
