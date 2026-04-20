@@ -590,6 +590,69 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
   </div>
 </div>
 
+<!-- OOO other-agents impact modal -->
+<div class="modal-overlay" id="ooo-impact-modal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-title">Team impact during OOO window</div>
+    <div id="ooo-impact-info" style="font-size:12px;color:var(--text-tertiary);margin-bottom:1rem"></div>
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:.75rem">The following activities are scheduled for the remaining agents during this window. Check any you want to cancel (replace with On Phones):</p>
+    <div id="ooo-impact-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:1rem"></div>
+    <div class="btn-row">
+      <button class="bp" onclick="applyOooImpact()">Apply selected cancellations</button>
+      <button class="bs" onclick="skipOooImpact()">No changes to other agents</button>
+    </div>
+  </div>
+</div>
+
+<!-- OOO type modal -->
+<div class="modal-overlay" id="ooo-modal">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-title" id="ooo-modal-title">Mark OOO</div>
+    <div id="ooo-modal-info" style="font-size:12px;color:var(--text-tertiary);margin-bottom:1rem"></div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:1rem">
+      <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;padding:10px 12px;border-radius:var(--radius-md);border:0.5px solid var(--border-light)">
+        <input type="radio" name="ooo-type" value="full" checked onchange="onOooTypeChange()"> Full day OOO
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;padding:10px 12px;border-radius:var(--radius-md);border:0.5px solid var(--border-light)">
+        <input type="radio" name="ooo-type" value="partial" onchange="onOooTypeChange()"> Partial OOO (specific time window)
+      </label>
+    </div>
+    <div id="ooo-partial-fields" style="display:none;margin-bottom:1rem">
+      <div class="form-row">
+        <div><label>From</label><input type="time" id="ooo-start" oninput="checkOooConflicts()" style="width:100%;font-size:13px;padding:7px 9px;border:0.5px solid var(--border-mid);border-radius:var(--radius-md);background:var(--bg-primary);color:var(--text-primary);font-family:var(--font)"></div>
+        <div><label>To</label><input type="time" id="ooo-end" oninput="checkOooConflicts()" style="width:100%;font-size:13px;padding:7px 9px;border:0.5px solid var(--border-mid);border-radius:var(--radius-md);background:var(--bg-primary);color:var(--text-primary);font-family:var(--font)"></div>
+      </div>
+      <div id="ooo-conflict-warning" style="display:none;margin-top:10px;padding:10px 12px;background:#FAEEDA;border-radius:var(--radius-md);border:0.5px solid #FAC775">
+        <div style="font-size:12px;font-weight:500;color:#633806;margin-bottom:6px">⚠ This window overlaps scheduled activities:</div>
+        <div id="ooo-conflict-list" style="font-size:12px;color:#633806;margin-bottom:8px"></div>
+        <div style="font-size:12px;color:#633806;margin-bottom:6px">Reschedule these activities?</div>
+        <div style="display:flex;gap:8px">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="radio" name="ooo-reschedule" value="yes" checked> Yes — move to after OOO window</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="radio" name="ooo-reschedule" value="no"> No — remove them</label>
+        </div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="bp" onclick="applyOOO()">Apply</button>
+      <button class="bs" onclick="closeOooModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Schedule change confirmation modal -->
+<div class="modal-overlay" id="sched-confirm-modal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-title" id="sched-confirm-title">Confirm schedule change</div>
+    <div id="sched-confirm-agent-date" style="font-size:12px;color:var(--text-tertiary);margin-bottom:1rem"></div>
+    <div style="font-size:12px;font-weight:500;color:var(--text-secondary);margin-bottom:6px">New schedule for the day:</div>
+    <div id="sched-confirm-preview" style="margin-bottom:1rem"></div>
+    <div class="btn-row">
+      <button class="bp" onclick="schedConfirmApply()">Confirm &amp; save</button>
+      <button class="bs" onclick="schedConfirmCancel()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="redist-modal">
   <div class="modal">
     <div class="modal-title" id="redist-title">Redistribute time?</div>
@@ -830,11 +893,209 @@ function applyOOOCoverage(blocks){
   return result;
 }
 
+let _oooContext={agent:null,dateStr:null,day:null,fw:null};
+
 function toggleOOO(agent,dateStr){
   if(!managerUnlocked){requirePIN('manager',()=>toggleOOO(agent,dateStr));return;}
+  // If already OOO, toggle it off immediately
+  if(ooo[agent]&&ooo[agent][dateStr]){
+    ooo[agent][dateStr]=false;
+    save();renderAll();
+    return;
+  }
+  // Otherwise open the OOO type modal
+  const d=new Date(dateStr+'T12:00:00');
+  const dayName=d.toLocaleDateString('en-US',{weekday:'long'});
+  const savedWO=weekOffset;
+  for(let wo=-52;wo<=52;wo++){if(toISO(dateOfDay(dayName,wo))===dateStr){weekOffset=wo;break;}}
+  const fw=dayName==='Friday'?getFriWeekForDate(d):1;
+  _oooContext={agent,dateStr,day:dayName,fw};
+  weekOffset=savedWO;
+
+  const dateDisp=new Date(dateStr+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+  document.getElementById('ooo-modal-title').textContent=`OOO — ${agent}`;
+  document.getElementById('ooo-modal-info').textContent=`${dateDisp} · ${ATZ[agent]}`;
+  // Reset to full day
+  document.querySelector('input[name="ooo-type"][value="full"]').checked=true;
+  document.getElementById('ooo-partial-fields').style.display='none';
+  document.getElementById('ooo-conflict-warning').style.display='none';
+  document.getElementById('ooo-start').value='';
+  document.getElementById('ooo-end').value='';
+  document.getElementById('ooo-modal').classList.add('open');
+}
+
+function onOooTypeChange(){
+  const type=document.querySelector('input[name="ooo-type"]:checked').value;
+  document.getElementById('ooo-partial-fields').style.display=type==='partial'?'block':'none';
+  document.getElementById('ooo-conflict-warning').style.display='none';
+}
+
+function checkOooConflicts(){
+  const start=document.getElementById('ooo-start').value;
+  const end=document.getElementById('ooo-end').value;
+  if(!start||!end||t2m(end)<=t2m(start)) return;
+  const{agent,day,fw}=_oooContext;
+  const blocks=getRawBlocks(agent,day,fw);
+  const conflicts=blocks.filter(b=>
+    TO_ACTIVITIES.has(b[0])&&t2m(b[2])>t2m(start)&&t2m(b[1])<t2m(end)
+  );
+  const warn=document.getElementById('ooo-conflict-warning');
+  const list=document.getElementById('ooo-conflict-list');
+  if(conflicts.length){
+    const tz=ATZ[agent];
+    list.innerHTML=conflicts.map(b=>{
+      const c=COLORS[b[0]]||{bg:'#D3D1C7',text:'#444441'};
+      return`<span style="display:inline-flex;align-items:center;gap:3px;margin-right:5px;background:${c.bg};color:${c.text};padding:1px 6px;border-radius:4px;font-size:11px">${b[0]} ${m2d(t2m(b[1]))}–${m2d(t2m(b[2]))}</span>`;
+    }).join('');
+    warn.style.display='block';
+  } else {
+    warn.style.display='none';
+  }
+}
+
+function applyOOO(){
+  const type=document.querySelector('input[name="ooo-type"]:checked').value;
+  const{agent,dateStr,day,fw}=_oooContext;
   if(!ooo[agent])ooo[agent]={};
-  ooo[agent][dateStr]=!ooo[agent][dateStr];
-  save();renderAll();
+
+  if(type==='full'){
+    ooo[agent][dateStr]=true;
+    save();renderAll();
+    closeOooModal();
+    return;
+  }
+
+  // Partial OOO
+  const start=document.getElementById('ooo-start').value;
+  const end=document.getElementById('ooo-end').value;
+  if(!start||!end){alert('Please enter a start and end time.');return;}
+  if(t2m(end)<=t2m(start)){alert('End time must be after start time.');return;}
+
+  ooo[agent][dateStr]={start,end};
+
+  // Build new blocks for the OOO agent
+  const reschedule=document.querySelector('input[name="ooo-reschedule"]:checked')?.value;
+  const warn=document.getElementById('ooo-conflict-warning');
+  const blocks=getRawBlocks(agent,day,fw);
+  const hs=t2m(start),he=t2m(end);
+  let newBlocks=[];
+  blocks.forEach(b=>{
+    const bs=t2m(b[1]),be=t2m(b[2]);
+    const overlaps=TO_ACTIVITIES.has(b[0])&&be>hs&&bs<he;
+    if(!overlaps){
+      newBlocks.push([...b]);
+    } else if(warn.style.display!=='none'&&reschedule==='yes'){
+      const beforeDur=Math.max(0,hs-bs);
+      const totalDur=be-bs;
+      const remainingDur=totalDur-beforeDur;
+      if(beforeDur>0) newBlocks.push([b[0],b[1],m2t(hs)]);
+      if(remainingDur>0) newBlocks.push([b[0],m2t(he),m2t(he+remainingDur)]);
+    } else if(warn.style.display!=='none'&&reschedule==='no'){
+      if(bs<hs) newBlocks.push([b[0],b[1],m2t(hs)]);
+      if(be>he) newBlocks.push([b[0],m2t(he),b[2]]);
+    } else {
+      // No conflict — trim On Phones/other around Off block
+      if(bs<hs) newBlocks.push([b[0],b[1],m2t(hs)]);
+      if(be>he) newBlocks.push([b[0],m2t(he),b[2]]);
+    }
+  });
+  newBlocks.push(['Off',start,end]);
+  newBlocks=newBlocks.filter(b=>t2m(b[2])>t2m(b[1])).sort((a,b)=>t2m(a[1])-t2m(b[1]));
+
+  // Store pending context for impact modal
+  _oooContext={..._oooContext,start,end,newBlocks};
+  closeOooModal();
+
+  // Check other agents for TO activities during this window
+  const otherAgents=AGENTS.filter(a=>a!==agent);
+  const impacts=[];
+  otherAgents.forEach(oa=>{
+    const savedWO=weekOffset;
+    const d=new Date(dateStr+'T12:00:00');
+    const dayName=d.toLocaleDateString('en-US',{weekday:'long'});
+    for(let wo=-52;wo<=52;wo++){if(toISO(dateOfDay(dayName,wo))===dateStr){weekOffset=wo;break;}}
+    const ofw=dayName==='Friday'?getFriWeekForDate(d):1;
+    const oblocks=getRawBlocks(oa,dayName,ofw);
+    weekOffset=savedWO;
+    const overlapping=oblocks.filter(b=>TO_ACTIVITIES.has(b[0])&&t2m(b[2])>hs&&t2m(b[1])<he);
+    if(overlapping.length) impacts.push({agent:oa,day:dayName,fw:ofw,blocks:oblocks,overlapping});
+  });
+
+  if(impacts.length){
+    // Show impact modal
+    const dateDisp=new Date(dateStr+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+    document.getElementById('ooo-impact-info').textContent=
+      `${agent} partial OOO ${m2d(hs)}–${m2d(he)} on ${dateDisp}`;
+    document.getElementById('ooo-impact-list').innerHTML=impacts.map(imp=>{
+      const tz=ATZ[imp.agent];
+      return imp.overlapping.map(b=>{
+        const c=COLORS[b[0]]||{bg:'#D3D1C7',text:'#444441'};
+        const id=`ooo-impact-${imp.agent}-${b[1]}`;
+        return`<label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;padding:8px 10px;border-radius:var(--radius-md);border:0.5px solid var(--border-light)">
+          <input type="checkbox" id="${id}" data-agent="${imp.agent}" data-start="${b[1]}" data-end="${b[2]}" data-act="${b[0]}" style="margin:0">
+          <div style="width:10px;height:10px;border-radius:2px;flex-shrink:0;background:${c.bg}"></div>
+          <span><strong>${imp.agent}</strong> — ${b[0]} ${m2d(t2m(b[1]))}–${m2d(t2m(b[2]))} <span style="color:var(--text-tertiary)">${tz}</span></span>
+        </label>`;
+      }).join('');
+    }).join('');
+    // Store impacts for use when modal is confirmed
+    _oooContext._impacts=impacts;
+    document.getElementById('ooo-impact-modal').classList.add('open');
+  } else {
+    // No other-agent impacts — go straight to OOO agent confirmation
+    _commitPartialOOO();
+  }
+}
+
+function applyOooImpact(){
+  document.getElementById('ooo-impact-modal').classList.remove('open');
+  // Find checked items and replace those blocks with On Phones
+  const checks=document.querySelectorAll('#ooo-impact-list input[type=checkbox]:checked');
+  const{dateStr,start,end}=_oooContext;
+  const d=new Date(dateStr+'T12:00:00');
+  const dayName=d.toLocaleDateString('en-US',{weekday:'long'});
+  // Group by agent
+  const byAgent={};
+  checks.forEach(cb=>{
+    const ag=cb.dataset.agent;
+    if(!byAgent[ag]) byAgent[ag]=[];
+    byAgent[ag].push({start:cb.dataset.start,end:cb.dataset.end,act:cb.dataset.act});
+  });
+  Object.entries(byAgent).forEach(([oa,toCancel])=>{
+    const savedWO=weekOffset;
+    for(let wo=-52;wo<=52;wo++){if(toISO(dateOfDay(dayName,wo))===dateStr){weekOffset=wo;break;}}
+    const imp=_oooContext._impacts.find(i=>i.agent===oa);
+    const ofw=imp?imp.fw:1;
+    let oblocks=JSON.parse(JSON.stringify(getRawBlocks(oa,dayName,ofw)));
+    weekOffset=savedWO;
+    toCancel.forEach(tc=>{
+      oblocks=oblocks.map(b=>
+        b[0]===tc.act&&b[1]===tc.start&&b[2]===tc.end?['On Phones',b[1],b[2]]:b
+      );
+    });
+    oblocks=mergeOP(oblocks);
+    if(!schedOverrides[oa])schedOverrides[oa]={};
+    schedOverrides[oa][dateStr]=oblocks;
+    notifyAgentScheduleChange(oa,dateStr,oblocks);
+  });
+  save();
+  _commitPartialOOO();
+}
+
+function skipOooImpact(){
+  document.getElementById('ooo-impact-modal').classList.remove('open');
+  _commitPartialOOO();
+}
+
+function _commitPartialOOO(){
+  const{agent,day,fw,newBlocks}=_oooContext;
+  save();
+  schedConfirmSave(agent,day,fw,newBlocks);
+}
+
+function closeOooModal(){
+  document.getElementById('ooo-modal').classList.remove('open');
+  _oooContext={agent:null,dateStr:null,day:null,fw:null};
 }
 
 function getRawBlocks(agent,day,fw){
@@ -870,11 +1131,56 @@ function gBlocks(agent,day,fw,tS,tF){
       blocks=mergeOP(blocks.map(x=>x[0]==='Project Time'?['On Phones',x[1],x[2]]:x));
     }
   }
-  if(ooo[agent]&&ooo[agent][dateStr]) return blocks;
+  // Full-day OOO — return blocks untransformed (agent is out)
+  if(ooo[agent]&&ooo[agent][dateStr]===true) return blocks;
+  // Partial OOO — replace the OOO window with Off, leave rest alone
+  if(ooo[agent]&&ooo[agent][dateStr]&&typeof ooo[agent][dateStr]==='object'){
+    const{start,end}=ooo[agent][dateStr];
+    const hs=t2m(start),he=t2m(end);
+    let partial=[];
+    blocks.forEach(b=>{
+      const bs=t2m(b[1]),be=t2m(b[2]);
+      if(be<=hs||bs>=he){partial.push(b);}
+      else{
+        if(bs<hs) partial.push([b[0],b[1],m2t(hs)]);
+        if(be>he) partial.push([b[0],m2t(he),b[2]]);
+      }
+    });
+    partial.push(['Off',start,end]);
+    partial=partial.filter(b=>t2m(b[2])>t2m(b[1])).sort((a,b)=>t2m(a[1])-t2m(b[1]));
+    return partial;
+  }
   const someoneOOO=AGENTS.filter(a=>a!==agent&&ooo[a]&&ooo[a][dateStr]).length>0;
   if(someoneOOO) return applyOOOCoverage(blocks);
   return blocks;
 }
+// Merge proposed blocks into an existing schedule.
+// Proposed blocks overwrite only their time window; existing blocks outside are preserved.
+// Existing blocks that overlap a proposed window are trimmed or removed.
+function mergeBlocksIntoSchedule(existing,proposed){
+  let result=[...existing.map(b=>[...b])]; // deep copy
+  proposed.forEach(pb=>{
+    const ps=t2m(pb[1]),pe=t2m(pb[2]);
+    const kept=[];
+    result.forEach(eb=>{
+      const es=t2m(eb[1]),ee=t2m(eb[2]);
+      if(ee<=ps||es>=pe){
+        // No overlap — keep as-is
+        kept.push(eb);
+      } else {
+        // Overlaps — trim the existing block
+        if(es<ps) kept.push([eb[0],eb[1],m2t(ps)]); // left portion before proposed
+        if(ee>pe) kept.push([eb[0],m2t(pe),eb[2]]); // right portion after proposed
+        // Middle is swallowed by the proposed block
+      }
+    });
+    kept.push([pb[0],pb[1],pb[2]]);
+    result=kept;
+  });
+  // Sort and remove zero-length blocks
+  return result.filter(b=>t2m(b[2])>t2m(b[1])).sort((a,b)=>t2m(a[1])-t2m(b[1]));
+}
+
 function mergeOP(b){
   if(!b.length)return b;
   const s=[...b].sort((a,x)=>t2m(a[1])-t2m(x[1]));
@@ -1311,7 +1617,8 @@ function renderManager(){
   const wrap=document.getElementById('mgr-timelines');wrap.innerHTML='';
   AGENTS.forEach(a=>{
     const tz=ATZ[a];
-    const isOOO=ooo[a]&&ooo[a][mDateStr];
+    const isOOO=ooo[a]&&ooo[a][mDateStr]===true;
+    const isPartialOOO=ooo[a]&&ooo[a][mDateStr]&&typeof ooo[a][mDateStr]==='object';
     const isNoOB=mDay!=='Friday'&&noOB[mDateStr]&&noOB[mDateStr][a];
     const isNoPT=mDay!=='Friday'&&noPT[mDateStr]&&noPT[mDateStr][a];
     const isHoliday=noHoliday[mDateStr]&&noHoliday[mDateStr][a];
@@ -1321,9 +1628,10 @@ function renderManager(){
         <div style="display:flex;align-items:center;gap:8px">
           <div class="agent-name" style="${isOOO?'opacity:0.4;text-decoration:line-through':''}">${a}</div>
           ${isOOO?`<span style="font-size:10px;background:#FAEEDA;color:#633806;border:0.5px solid #FAC775;padding:1px 7px;border-radius:20px;font-weight:500">OOO</span>`:''}
-          ${isNoOB&&!isOOO?`<span style="font-size:10px;background:#E6F1FB;color:#185FA5;border:0.5px solid #B5D4F4;padding:1px 7px;border-radius:20px;font-weight:500">No OB</span>`:''}
-          ${isNoPT&&!isOOO?`<span style="font-size:10px;background:#EAF3DE;color:#27500A;border:0.5px solid #C0DD97;padding:1px 7px;border-radius:20px;font-weight:500">No PT</span>`:''}
-          ${isHoliday&&!isOOO?`<span style="font-size:10px;background:#F4C0D1;color:#72243E;border:0.5px solid #E8A0BC;padding:1px 7px;border-radius:20px;font-weight:500">🎉 Holiday</span>`:''}
+          ${isPartialOOO?`<span style="font-size:10px;background:#FAEEDA;color:#633806;border:0.5px solid #FAC775;padding:1px 7px;border-radius:20px;font-weight:500">Partial OOO ${m2d(t2m(ooo[a][mDateStr].start))}–${m2d(t2m(ooo[a][mDateStr].end))}</span>`:''}
+          ${isNoOB&&!isOOO&&!isPartialOOO?`<span style="font-size:10px;background:#E6F1FB;color:#185FA5;border:0.5px solid #B5D4F4;padding:1px 7px;border-radius:20px;font-weight:500">No OB</span>`:''}
+          ${isNoPT&&!isOOO&&!isPartialOOO?`<span style="font-size:10px;background:#EAF3DE;color:#27500A;border:0.5px solid #C0DD97;padding:1px 7px;border-radius:20px;font-weight:500">No PT</span>`:''}
+          ${isHoliday&&!isOOO&&!isPartialOOO?`<span style="font-size:10px;background:#F4C0D1;color:#72243E;border:0.5px solid #E8A0BC;padding:1px 7px;border-radius:20px;font-weight:500">🎉 Holiday</span>`:''}
         </div>
         <div style="display:flex;align-items:center;gap:6px">
           <div class="tz-pills">
@@ -1331,21 +1639,21 @@ function renderManager(){
             <span style="font-size:10px;color:var(--text-tertiary)">·</span>
             <span class="tz-pill pst">PST</span>
           </div>
-          ${mDay!=='Friday'&&!isOOO?`<button onclick="toggleAgentOB('${a}','${mDateStr}')"
+          ${mDay!=='Friday'&&!isOOO&&!isPartialOOO?`<button onclick="toggleAgentOB('${a}','${mDateStr}')"
             style="font-size:11px;padding:2px 9px;border-radius:20px;cursor:pointer;font-family:var(--font);border:0.5px solid;${isNoOB?'background:#E6F1FB;color:#185FA5;border-color:#B5D4F4':'background:var(--bg-secondary);color:var(--text-tertiary);border-color:var(--border-light)'}">
             ${isNoOB?'✓ OB on':'No OB'}
           </button>`:''}
-          ${mDay!=='Friday'&&!isOOO?`<button onclick="toggleAgentPT('${a}','${mDateStr}')"
+          ${mDay!=='Friday'&&!isOOO&&!isPartialOOO?`<button onclick="toggleAgentPT('${a}','${mDateStr}')"
             style="font-size:11px;padding:2px 9px;border-radius:20px;cursor:pointer;font-family:var(--font);border:0.5px solid;${isNoPT?'background:#EAF3DE;color:#27500A;border-color:#C0DD97':'background:var(--bg-secondary);color:var(--text-tertiary);border-color:var(--border-light)'}">
             ${isNoPT?'✓ PT on':'No PT'}
           </button>`:''}
-          ${!isOOO?`<button onclick="toggleAgentHoliday('${a}','${mDateStr}')"
+          ${!isOOO&&!isPartialOOO?`<button onclick="toggleAgentHoliday('${a}','${mDateStr}')"
             style="font-size:11px;padding:2px 9px;border-radius:20px;cursor:pointer;font-family:var(--font);border:0.5px solid;${isHoliday?'background:#F4C0D1;color:#72243E;border-color:#E8A0BC':'background:var(--bg-secondary);color:var(--text-tertiary);border-color:var(--border-light)'}">
             ${isHoliday?'✓ Working':'🎉 Holiday'}
           </button>`:''}
           <button onclick="toggleOOO('${a}','${mDateStr}')"
-            style="font-size:11px;padding:2px 9px;border-radius:20px;cursor:pointer;font-family:var(--font);border:0.5px solid;${isOOO?'background:#EAF3DE;color:#27500A;border-color:#C0DD97':'background:var(--bg-secondary);color:var(--text-tertiary);border-color:var(--border-light)'}">
-            ${isOOO?'✓ Back':'OOO'}
+            style="font-size:11px;padding:2px 9px;border-radius:20px;cursor:pointer;font-family:var(--font);border:0.5px solid;${(isOOO||isPartialOOO)?'background:#EAF3DE;color:#27500A;border-color:#C0DD97':'background:var(--bg-secondary);color:var(--text-tertiary);border-color:var(--border-light)'}">
+            ${(isOOO||isPartialOOO)?'✓ Back':'OOO'}
           </button>
         </div>
       </div>
@@ -1966,11 +2274,15 @@ function bamSaveAdd(){
   if(!ns||!ne){alert('Please enter start and end times.');return;}
   if(t2m(ne)<=t2m(ns)){alert('End time must be after start time.');return;}
   const{agent,day,fw}=bam;
-  const blocks=JSON.parse(JSON.stringify(getRawBlocks(agent,day,fw)));
-  blocks.push([act,ns,ne]);
-  blocks.sort((a,b)=>t2m(a[1])-t2m(b[1]));
-  saveBlocksForDate(agent,day,fw,blocks);
+  let blocks=JSON.parse(JSON.stringify(getRawBlocks(agent,day,fw)));
+  if(act==='Huddle'){
+    blocks=insertHuddle(blocks,ns,ne);
+  } else {
+    blocks.push([act,ns,ne]);
+    blocks.sort((a,b)=>t2m(a[1])-t2m(b[1]));
+  }
   closeBam();
+  saveBlocksForDate(agent,day,fw,blocks);
 }
 
 function openBlockAction(e,agent,day,fw,idx){
@@ -2031,8 +2343,8 @@ function bamSaveEdit(){
   const blocks=JSON.parse(JSON.stringify(getRawBlocks(agent,day,fw)));
   blocks[idx]=[act,ns,ne];
   blocks.sort((a,b)=>t2m(a[1])-t2m(b[1]));
-  saveBlocksForDate(agent,day,fw,blocks);
   closeBam();
+  saveBlocksForDate(agent,day,fw,blocks);
 }
 
 function bamConfirmDelete(){
@@ -2055,23 +2367,147 @@ function bamConfirmDelete(){
     blocks[idx+1][1]=block[1];
     blocks.splice(idx,1);
   }
-  saveBlocksForDate(agent,day,fw,blocks);
   closeBam();
+  saveBlocksForDate(agent,day,fw,blocks);
+}
+
+// ── Huddle insertion ─────────────────────────────────────────
+// Insert a Huddle block, shifting any non-On Phones activity that overlaps
+// to start at the end of the Huddle. On Phones time is simply trimmed/removed.
+function insertHuddle(blocks, huddleStart, huddleEnd){
+  const hs=t2m(huddleStart), he=t2m(huddleEnd);
+  const sorted=[...blocks].sort((a,b)=>t2m(a[1])-t2m(b[1]));
+  let result=[];
+
+  sorted.forEach(b=>{
+    const bs=t2m(b[1]), be=t2m(b[2]);
+    if(be<=hs){
+      // Entirely before huddle — untouched
+      result.push([...b]);
+    } else if(bs>=he){
+      // Entirely after huddle — untouched
+      result.push([...b]);
+    } else if(b[0]==='On Phones'){
+      // On Phones: huddle simply cuts into it, no shift
+      if(bs<hs) result.push([b[0],b[1],m2t(hs)]);
+      if(be>he) result.push([b[0],m2t(he),b[2]]);
+    } else {
+      // Protected activity: keep portion before huddle, resume full remaining duration after
+      const beforeDur=Math.max(0,hs-bs);
+      const totalDur=be-bs;
+      const remainingDur=totalDur-beforeDur;
+      if(beforeDur>0) result.push([b[0],b[1],m2t(hs)]);
+      if(remainingDur>0) result.push([b[0],m2t(he),m2t(he+remainingDur)]);
+    }
+  });
+
+  // Insert the huddle
+  result.push(['Huddle',huddleStart,huddleEnd]);
+
+  // Now clean up: any On Phones block that overlaps a resumed protected activity gets trimmed
+  // (because the protected activity pushed into On Phones time)
+  result=result.sort((a,b)=>t2m(a[1])-t2m(b[1]));
+  const cleaned=[];
+  result.forEach(b=>{
+    if(b[0]==='On Phones'){
+      // Trim this On Phones block against all non-On-Phones, non-Huddle... wait, just check overlaps
+      let start=t2m(b[1]), end=t2m(b[2]);
+      // Find all protected blocks that overlap this On Phones window
+      const protected_=result.filter(x=>x!==b&&x[0]!=='On Phones'&&t2m(x[2])>start&&t2m(x[1])<end);
+      if(!protected_.length){
+        cleaned.push(b);
+      } else {
+        // Slice On Phones around each protected block
+        let cursor=start;
+        protected_.sort((a,x)=>t2m(a[1])-t2m(x[1])).forEach(p=>{
+          const ps=t2m(p[1]),pe=t2m(p[2]);
+          if(cursor<ps) cleaned.push(['On Phones',m2t(cursor),m2t(ps)]);
+          cursor=Math.max(cursor,pe);
+        });
+        if(cursor<end) cleaned.push(['On Phones',m2t(cursor),m2t(end)]);
+      }
+    } else {
+      cleaned.push(b);
+    }
+  });
+
+  return cleaned.filter(b=>t2m(b[2])>t2m(b[1])).sort((a,b)=>t2m(a[1])-t2m(b[1]));
+}
+
+// ── Schedule change confirmation ──────────────────────────────
+let _pendingSchedSave=null; // {agent, day, fw, blocks, dateStr}
+
+function schedConfirmSave(agent,day,fw,blocks){
+  const dateStr=toISO(dateOfDay(day,weekOffset));
+  const clean=blocks.filter(b=>t2m(b[2])>t2m(b[1])).sort((a,b)=>t2m(a[1])-t2m(b[1]));
+  const tz=ATZ[agent];
+  const dateDisp=new Date(dateStr+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+
+  _pendingSchedSave={agent,day,fw,blocks:clean,dateStr};
+
+  document.getElementById('sched-confirm-title').textContent=`Confirm — ${agent}`;
+  document.getElementById('sched-confirm-agent-date').textContent=`${dateDisp} · ${tz}`;
+
+  // Build timeline preview
+  const bS=clean.length?Math.min(...clean.map(b=>t2m(b[1]))):t2m('09:00');
+  const bE=clean.length?Math.max(...clean.map(b=>t2m(b[2]))):t2m('17:00');
+  const tot=bE-bS||1;
+  let barHTML=`<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-tertiary);margin-bottom:3px"><span>${m2d(bS)}</span><span>${m2d(bE)}</span></div>`;
+  barHTML+=`<div style="display:flex;height:36px;border-radius:6px;overflow:hidden;margin-bottom:10px">`;
+  clean.forEach(b=>{
+    const c=COLORS[b[0]]||{bg:'#D3D1C7',text:'#444441'};
+    const w=((t2m(b[2])-t2m(b[1]))/tot*100).toFixed(2);
+    const lbl=getLabel(b[0],parseFloat(w));
+    barHTML+=`<div style="width:${w}%;background:${c.bg};color:${c.text};font-size:10px;display:flex;align-items:center;justify-content:center;overflow:hidden;white-space:nowrap" title="${b[0]}: ${m2d(t2m(b[1]))}–${m2d(t2m(b[2]))}">${lbl}</div>`;
+  });
+  barHTML+=`</div>`;
+  // Block list
+  barHTML+=`<div style="display:flex;flex-direction:column;gap:4px">`;
+  clean.forEach(b=>{
+    const c=COLORS[b[0]]||{bg:'#D3D1C7',text:'#444441'};
+    const dur=t2m(b[2])-t2m(b[1]);
+    const durLabel=dur>=60?Math.floor(dur/60)+'h '+(dur%60?dur%60+'m':''):dur+'m';
+    barHTML+=`<div style="display:flex;align-items:center;gap:8px;font-size:12px">
+      <div style="width:10px;height:10px;border-radius:2px;flex-shrink:0;background:${c.bg}"></div>
+      <span style="flex:1"><strong>${b[0]}</strong></span>
+      <span style="color:var(--text-secondary)">${m2d(t2m(b[1]))}–${m2d(t2m(b[2]))} <span style="color:var(--text-tertiary)">(${durLabel})</span></span>
+    </div>`;
+  });
+  barHTML+=`</div>`;
+  document.getElementById('sched-confirm-preview').innerHTML=barHTML;
+  document.getElementById('sched-confirm-modal').classList.add('open');
+}
+
+function schedConfirmApply(){
+  if(!_pendingSchedSave) return;
+  document.getElementById('sched-confirm-modal').classList.remove('open');
+  if(_pendingSchedSave._onConfirm){
+    const cb=_pendingSchedSave._onConfirm;
+    _pendingSchedSave=null;
+    cb();
+    return;
+  }
+  const{agent,day,fw,blocks,dateStr}=_pendingSchedSave;
+  _pendingSchedSave=null;
+  if(day==='Friday'){
+    if(!friOverrides[fw][agent]) friOverrides[fw][agent]={};
+    friOverrides[fw][agent][dateStr]=blocks;
+  } else {
+    if(!schedOverrides[agent]) schedOverrides[agent]={};
+    schedOverrides[agent][dateStr]=blocks;
+  }
+  save();
+  notifyAgentScheduleChange(agent,dateStr,blocks);
+  renderAll();
+}
+
+function schedConfirmCancel(){
+  _pendingSchedSave=null;
+  document.getElementById('sched-confirm-modal').classList.remove('open');
 }
 
 function saveBlocksForDate(agent,day,fw,blocks){
-  const dateStr=toISO(dateOfDay(day,weekOffset));
-  const clean=blocks.filter(b=>t2m(b[2])>t2m(b[1])).sort((a,b)=>t2m(a[1])-t2m(b[1]));
-  if(day==='Friday'){
-    if(!friOverrides[fw][agent]) friOverrides[fw][agent]={};
-    friOverrides[fw][agent][dateStr]=clean;
-  } else {
-    if(!schedOverrides[agent]) schedOverrides[agent]={};
-    schedOverrides[agent][dateStr]=clean;
-  }
-  save();
-  notifyAgentScheduleChange(agent,dateStr,clean);
-  renderAll();
+  schedConfirmSave(agent,day,fw,blocks);
 }
 
 function closeBam(){
@@ -2739,61 +3175,113 @@ function resolveRequest(id,status){
   if(!req)return;
   const noteEl=document.getElementById(`mgr-note-${id}`);
   req.managerNote=noteEl?noteEl.value.trim():'';
-  req.status=status;
-  req.resolvedAt=new Date().toISOString();
 
-  if(status==='approved'){
-    const d=new Date(req.date+'T12:00:00');
-    const dayName=d.toLocaleDateString('en-US',{weekday:'long'});
-
-    if(req.type==='shift'&&req.shiftNewStart){
-      // Offset every block by the difference between new start and current shift start
-      const savedWO=weekOffset;
-      for(let wo=-52;wo<=52;wo++){if(toISO(dateOfDay(dayName,wo))===req.date){weekOffset=wo;break;}}
-      const fw=dayName==='Friday'?getFriWeekForDate(d):1;
-      const blocks=JSON.parse(JSON.stringify(getRawBlocks(req.agent,dayName,fw)));
-      weekOffset=savedWO;
-      if(blocks.length){
-        const curStart=Math.min(...blocks.map(b=>t2m(b[1])));
-        const offsetMins=t2m(req.shiftNewStart)-curStart;
-        const shifted=blocks.map(b=>[b[0],m2t(t2m(b[1])+offsetMins),m2t(t2m(b[2])+offsetMins)]);
-        if(!schedOverrides[req.agent])schedOverrides[req.agent]={};
-        schedOverrides[req.agent][req.date]=shifted;
-        save();
-        notifyAgentScheduleChange(req.agent,req.date,shifted);
-      }
-    } else if(req.blocks.length){
-      const clean=JSON.parse(JSON.stringify(req.blocks)).sort((a,b)=>t2m(a[1])-t2m(b[1]));
-      if(req.type==='permanent'){
-        const savedWO=weekOffset;
-        for(let wo=-52;wo<=52;wo++){
-          const dateStr=toISO(dateOfDay(req.dayOfWeek,wo));
-          if(dateStr>=req.date){
-            if(!schedOverrides[req.agent])schedOverrides[req.agent]={};
-            schedOverrides[req.agent][dateStr]=JSON.parse(JSON.stringify(clean));
-          }
-        }
-        weekOffset=savedWO;
-      } else {
-        if(dayName==='Friday'){
-          const fw=getFriWeekForDate(d);
-          if(!friOverrides[fw][req.agent])friOverrides[fw][req.agent]={};
-          friOverrides[fw][req.agent][req.date]=clean;
-        } else {
-          if(!schedOverrides[req.agent])schedOverrides[req.agent]={};
-          schedOverrides[req.agent][req.date]=clean;
-        }
-        notifyAgentScheduleChange(req.agent,req.date,clean);
-      }
-      save();
-    }
+  if(status==='denied'){
+    req.status='denied';
+    req.resolvedAt=new Date().toISOString();
+    saveRequests();updateReqBadge();renderReviewList();renderAll();
+    notifyAgentRequestResolved(req,'denied');
+    return;
   }
 
-  saveRequests();
-  updateReqBadge();
-  renderReviewList();
-  renderAll();
-  notifyAgentRequestResolved(req,status);
+  // For approvals that touch the schedule — build the merged result then show confirmation
+  const d=new Date(req.date+'T12:00:00');
+  const dayName=d.toLocaleDateString('en-US',{weekday:'long'});
+
+  let previewBlocks=null;
+  let fw=1;
+
+  if(req.type==='shift'&&req.shiftNewStart){
+    const savedWO=weekOffset;
+    for(let wo=-52;wo<=52;wo++){if(toISO(dateOfDay(dayName,wo))===req.date){weekOffset=wo;break;}}
+    fw=dayName==='Friday'?getFriWeekForDate(d):1;
+    const blocks=JSON.parse(JSON.stringify(getRawBlocks(req.agent,dayName,fw)));
+    weekOffset=savedWO;
+    if(blocks.length){
+      const curStart=Math.min(...blocks.map(b=>t2m(b[1])));
+      const offsetMins=t2m(req.shiftNewStart)-curStart;
+      previewBlocks=blocks.map(b=>[b[0],m2t(t2m(b[1])+offsetMins),m2t(t2m(b[2])+offsetMins)]);
+    }
+  } else if(req.blocks.length&&req.type!=='permanent'){
+    const proposed=JSON.parse(JSON.stringify(req.blocks)).sort((a,b)=>t2m(a[1])-t2m(b[1]));
+    const savedWO=weekOffset;
+    for(let wo=-52;wo<=52;wo++){if(toISO(dateOfDay(dayName,wo))===req.date){weekOffset=wo;break;}}
+    fw=dayName==='Friday'?getFriWeekForDate(d):1;
+    const existing=getRawBlocks(req.agent,dayName,fw);
+    weekOffset=savedWO;
+    previewBlocks=mergeBlocksIntoSchedule(existing,proposed);
+  }
+
+  if(previewBlocks){
+    // Show full-day confirmation before committing
+    _pendingSchedSave={
+      agent:req.agent,day:dayName,fw,
+      blocks:previewBlocks.filter(b=>t2m(b[2])>t2m(b[1])).sort((a,b)=>t2m(a[1])-t2m(b[1])),
+      dateStr:req.date,
+      _onConfirm:()=>_finalizeResolveRequest(req,dayName,fw,previewBlocks),
+    };
+    // Build preview using the pending save data
+    const agent=req.agent,blocks=_pendingSchedSave.blocks,tz=ATZ[agent];
+    const dateDisp=new Date(req.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+    const bS=blocks.length?Math.min(...blocks.map(b=>t2m(b[1]))):t2m('09:00');
+    const bE=blocks.length?Math.max(...blocks.map(b=>t2m(b[2]))):t2m('17:00');
+    const tot=bE-bS||1;
+    let barHTML=`<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-tertiary);margin-bottom:3px"><span>${m2d(bS)}</span><span>${m2d(bE)}</span></div>`;
+    barHTML+=`<div style="display:flex;height:36px;border-radius:6px;overflow:hidden;margin-bottom:10px">`;
+    blocks.forEach(b=>{const c=COLORS[b[0]]||{bg:'#D3D1C7',text:'#444441'};const w=((t2m(b[2])-t2m(b[1]))/tot*100).toFixed(2);const lbl=getLabel(b[0],parseFloat(w));barHTML+=`<div style="width:${w}%;background:${c.bg};color:${c.text};font-size:10px;display:flex;align-items:center;justify-content:center;overflow:hidden;white-space:nowrap" title="${b[0]}: ${m2d(t2m(b[1]))}–${m2d(t2m(b[2]))}">${lbl}</div>`;});
+    barHTML+=`</div><div style="display:flex;flex-direction:column;gap:4px">`;
+    blocks.forEach(b=>{const c=COLORS[b[0]]||{bg:'#D3D1C7',text:'#444441'};const dur=t2m(b[2])-t2m(b[1]);const dl=dur>=60?Math.floor(dur/60)+'h '+(dur%60?dur%60+'m':''):dur+'m';barHTML+=`<div style="display:flex;align-items:center;gap:8px;font-size:12px"><div style="width:10px;height:10px;border-radius:2px;flex-shrink:0;background:${c.bg}"></div><span style="flex:1"><strong>${b[0]}</strong></span><span style="color:var(--text-secondary)">${m2d(t2m(b[1]))}–${m2d(t2m(b[2]))} <span style="color:var(--text-tertiary)">(${dl})</span></span></div>`;});
+    barHTML+=`</div>`;
+    document.getElementById('sched-confirm-title').textContent=`Approve — ${agent}`;
+    document.getElementById('sched-confirm-agent-date').textContent=`${dateDisp} · ${tz}`;
+    document.getElementById('sched-confirm-preview').innerHTML=barHTML;
+    document.getElementById('sched-confirm-modal').classList.add('open');
+    return; // wait for confirmation
+  }
+
+  // Permanent changes or no schedule blocks — apply directly
+  _finalizeResolveRequest(req,dayName,fw,null);
+}
+
+function _finalizeResolveRequest(req,dayName,fw,previewBlocks){
+  req.status='approved';
+  req.resolvedAt=new Date().toISOString();
+  const d=new Date(req.date+'T12:00:00');
+
+  if(previewBlocks){
+    const clean=previewBlocks.filter(b=>t2m(b[2])>t2m(b[1])).sort((a,b)=>t2m(a[1])-t2m(b[1]));
+    if(dayName==='Friday'){
+      if(!friOverrides[fw][req.agent])friOverrides[fw][req.agent]={};
+      friOverrides[fw][req.agent][req.date]=clean;
+    } else {
+      if(!schedOverrides[req.agent])schedOverrides[req.agent]={};
+      schedOverrides[req.agent][req.date]=clean;
+    }
+    notifyAgentScheduleChange(req.agent,req.date,clean);
+    save();
+  } else if(req.blocks.length&&req.type==='permanent'){
+    const proposed=JSON.parse(JSON.stringify(req.blocks)).sort((a,b)=>t2m(a[1])-t2m(b[1]));
+    const savedWO=weekOffset;
+    for(let wo=-52;wo<=52;wo++){
+      const dateStr=toISO(dateOfDay(req.dayOfWeek,wo));
+      if(dateStr>=req.date){
+        const existD=new Date(dateStr+'T12:00:00');
+        const existDay=existD.toLocaleDateString('en-US',{weekday:'long'});
+        weekOffset=wo;
+        const fw2=existDay==='Friday'?getFriWeekForDate(existD):1;
+        const existing=getRawBlocks(req.agent,existDay,fw2);
+        weekOffset=savedWO;
+        const merged=mergeBlocksIntoSchedule(existing,proposed);
+        if(!schedOverrides[req.agent])schedOverrides[req.agent]={};
+        schedOverrides[req.agent][dateStr]=merged;
+      }
+    }
+    weekOffset=savedWO;
+    save();
+  }
+
+  saveRequests();updateReqBadge();renderReviewList();renderAll();
+  notifyAgentRequestResolved(req,'approved');
 }
 
 function reqClearAll(){
