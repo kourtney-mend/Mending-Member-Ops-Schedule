@@ -642,6 +642,34 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
 </div>
 
 <!-- Schedule change confirmation modal -->
+<!-- Huddle conflict modal -->
+<div class="modal-overlay" id="huddle-conflict-modal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-title">Huddle conflicts with scheduled activity</div>
+    <div id="hcm-info" style="font-size:12px;color:var(--text-tertiary);margin-bottom:1rem"></div>
+    <div id="hcm-conflict" style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:10px 12px;margin-bottom:1rem;font-size:13px"></div>
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:.75rem">How would you like to handle it?</p>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:1.25rem">
+      <label style="display:flex;align-items:flex-start;gap:10px;font-size:13px;cursor:pointer;padding:10px 12px;border-radius:var(--radius-md);border:0.5px solid var(--border-light)">
+        <input type="radio" name="hcm-action" value="split" checked style="margin-top:2px"> 
+        <div><strong>Split &amp; extend</strong> — keep full duration, resume after the huddle ends</div>
+      </label>
+      <label style="display:flex;align-items:flex-start;gap:10px;font-size:13px;cursor:pointer;padding:10px 12px;border-radius:var(--radius-md);border:0.5px solid var(--border-light)">
+        <input type="radio" name="hcm-action" value="move" style="margin-top:2px">
+        <div><strong>Move activity</strong> — shift the entire block to start after the huddle</div>
+      </label>
+      <label style="display:flex;align-items:flex-start;gap:10px;font-size:13px;cursor:pointer;padding:10px 12px;border-radius:var(--radius-md);border:0.5px solid var(--border-light)">
+        <input type="radio" name="hcm-action" value="overlap" style="margin-top:2px">
+        <div><strong>Overlap</strong> — add huddle as-is, leave existing schedule unchanged</div>
+      </label>
+    </div>
+    <div class="btn-row">
+      <button class="bp" onclick="applyHuddleConflict()">Apply</button>
+      <button class="bs" onclick="cancelHuddleConflict()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="sched-confirm-modal">
   <div class="modal" style="max-width:480px">
     <div class="modal-title" id="sched-confirm-title">Confirm schedule change</div>
@@ -1589,16 +1617,7 @@ function cancelDrag(){
 }
 
 function applyDragCommit(agent,day,fw,blocks){
-  const dateStr=toISO(dateOfDay(day,weekOffset));
-  const clean=blocks.filter(b=>t2m(b[2])>t2m(b[1])).sort((a,b)=>t2m(a[1])-t2m(b[1]));
-  if(day==='Friday'){
-    if(!friOverrides[fw][agent]) friOverrides[fw][agent]={};
-    friOverrides[fw][agent][dateStr]=clean;
-  } else {
-    if(!schedOverrides[agent]) schedOverrides[agent]={};
-    schedOverrides[agent][dateStr]=clean;
-  }
-  save();renderAll();
+  saveBlocksForDate(agent,day,fw,blocks);
 }
 
 function forceApply(){
@@ -2344,6 +2363,8 @@ function bamResetDay(){
   document.getElementById('sched-confirm-modal').classList.add('open');
 }
 
+let _huddlePending=null; // {agent,day,fw,blocks,huddleStart,huddleEnd,conflictBlock}
+
 function bamSaveAdd(){
   const ns=document.getElementById('bam-add-start').value;
   const ne=document.getElementById('bam-add-end').value;
@@ -2351,15 +2372,123 @@ function bamSaveAdd(){
   if(!ns||!ne){alert('Please enter start and end times.');return;}
   if(t2m(ne)<=t2m(ns)){alert('End time must be after start time.');return;}
   const{agent,day,fw}=bam;
-  let blocks=JSON.parse(JSON.stringify(getRawBlocks(agent,day,fw)));
+  const blocks=JSON.parse(JSON.stringify(getRawBlocks(agent,day,fw)));
+
   if(act==='Huddle'){
-    blocks=insertHuddle(blocks,ns,ne);
+    // Check if huddle overlaps any non-On Phones block
+    const hs=t2m(ns),he=t2m(ne);
+    const conflict=blocks.find(b=>b[0]!=='On Phones'&&t2m(b[2])>hs&&t2m(b[1])<he);
+    if(conflict){
+      // Show conflict resolution modal
+      _huddlePending={agent,day,fw,blocks,huddleStart:ns,huddleEnd:ne,conflictBlock:conflict};
+      const tz=ATZ[agent];
+      const c=COLORS[conflict[0]]||{bg:'#D3D1C7',text:'#444441'};
+      const huddleDur=he-hs;
+      document.getElementById('hcm-info').textContent=
+        `Adding ${huddleDur}-min Huddle at ${m2d(hs)}–${m2d(he)} ${tz}`;
+      document.getElementById('hcm-conflict').innerHTML=
+        `Conflicts with: <span style="background:${c.bg};color:${c.text};padding:1px 8px;border-radius:4px;font-size:12px">${conflict[0]}</span> `+
+        `<strong>${m2d(t2m(conflict[1]))}–${m2d(t2m(conflict[2]))}</strong> `+
+        `<span style="color:var(--text-tertiary)">(${t2m(conflict[2])-t2m(conflict[1])} min)</span>`;
+      // Reset to default
+      document.querySelector('input[name="hcm-action"][value="split"]').checked=true;
+      closeBam();
+      document.getElementById('huddle-conflict-modal').classList.add('open');
+      return;
+    }
+    // No conflict — just insert into On Phones
+    const newBlocks=insertHuddleIntoOnPhones(blocks,ns,ne);
+    closeBam();
+    saveBlocksForDate(agent,day,fw,newBlocks);
   } else {
     blocks.push([act,ns,ne]);
     blocks.sort((a,b)=>t2m(a[1])-t2m(b[1]));
+    closeBam();
+    saveBlocksForDate(agent,day,fw,blocks);
   }
-  closeBam();
-  saveBlocksForDate(agent,day,fw,blocks);
+}
+
+function applyHuddleConflict(){
+  document.getElementById('huddle-conflict-modal').classList.remove('open');
+  if(!_huddlePending) return;
+  const{agent,day,fw,blocks,huddleStart,huddleEnd,conflictBlock}=_huddlePending;
+  _huddlePending=null;
+  const action=document.querySelector('input[name="hcm-action"]:checked').value;
+  const hs=t2m(huddleStart),he=t2m(huddleEnd),huddleDur=he-hs;
+  let newBlocks;
+
+  if(action==='overlap'){
+    // Just add huddle, leave everything else as-is
+    newBlocks=[...blocks,['Huddle',huddleStart,huddleEnd]].sort((a,b)=>t2m(a[1])-t2m(b[1]));
+  } else if(action==='move'){
+    // Shift the entire conflicting block to start after huddle ends
+    const blockDur=t2m(conflictBlock[2])-t2m(conflictBlock[1]);
+    newBlocks=blocks.map(b=>
+      b[0]===conflictBlock[0]&&b[1]===conflictBlock[1]&&b[2]===conflictBlock[2]
+        ?[b[0],m2t(he),m2t(he+blockDur)]
+        :b
+    );
+    newBlocks.push(['Huddle',huddleStart,huddleEnd]);
+    newBlocks=newBlocks.sort((a,b)=>t2m(a[1])-t2m(b[1]));
+  } else {
+    // Split: keep portion before huddle, resume full remaining duration after huddle
+    const bs=t2m(conflictBlock[1]),be=t2m(conflictBlock[2]);
+    const beforeDur=Math.max(0,hs-bs);
+    const totalDur=be-bs;
+    const remainingDur=totalDur-beforeDur;
+    // Remove the original conflict block, add the split pieces
+    newBlocks=blocks.filter(b=>!(b[0]===conflictBlock[0]&&b[1]===conflictBlock[1]&&b[2]===conflictBlock[2]));
+    if(beforeDur>0) newBlocks.push([conflictBlock[0],conflictBlock[1],m2t(hs)]);
+    if(remainingDur>0) newBlocks.push([conflictBlock[0],m2t(he),m2t(he+remainingDur)]);
+    newBlocks.push(['Huddle',huddleStart,huddleEnd]);
+    // Trim any On Phones that the resumed block now overlaps
+    newBlocks=resolveOnPhonesOverlaps(newBlocks);
+    newBlocks=newBlocks.sort((a,b)=>t2m(a[1])-t2m(b[1]));
+  }
+  newBlocks=newBlocks.filter(b=>t2m(b[2])>t2m(b[1]));
+  saveBlocksForDate(agent,day,fw,newBlocks);
+}
+
+function cancelHuddleConflict(){
+  document.getElementById('huddle-conflict-modal').classList.remove('open');
+  _huddlePending=null;
+}
+
+// Insert huddle into On Phones time only (no conflict)
+function insertHuddleIntoOnPhones(blocks,huddleStart,huddleEnd){
+  const hs=t2m(huddleStart),he=t2m(huddleEnd);
+  const result=[];
+  blocks.forEach(b=>{
+    const bs=t2m(b[1]),be=t2m(b[2]);
+    if(b[0]==='On Phones'&&be>hs&&bs<he){
+      if(bs<hs) result.push([b[0],b[1],m2t(hs)]);
+      if(be>he) result.push([b[0],m2t(he),b[2]]);
+    } else {
+      result.push([...b]);
+    }
+  });
+  result.push(['Huddle',huddleStart,huddleEnd]);
+  return result.filter(b=>t2m(b[2])>t2m(b[1])).sort((a,b)=>t2m(a[1])-t2m(b[1]));
+}
+
+// Trim On Phones blocks that overlap protected (non-On Phones) blocks
+function resolveOnPhonesOverlaps(blocks){
+  const result=[];
+  blocks.forEach(b=>{
+    if(b[0]!=='On Phones'){result.push(b);return;}
+    let start=t2m(b[1]),end=t2m(b[2]);
+    const overlapping=blocks.filter(x=>x!==b&&x[0]!=='On Phones'&&t2m(x[2])>start&&t2m(x[1])<end)
+      .sort((a,x)=>t2m(a[1])-t2m(x[1]));
+    if(!overlapping.length){result.push(b);return;}
+    let cursor=start;
+    overlapping.forEach(p=>{
+      const ps=t2m(p[1]),pe=t2m(p[2]);
+      if(cursor<ps) result.push(['On Phones',m2t(cursor),m2t(ps)]);
+      cursor=Math.max(cursor,pe);
+    });
+    if(cursor<end) result.push(['On Phones',m2t(cursor),m2t(end)]);
+  });
+  return result;
 }
 
 function openBlockAction(e,agent,day,fw,idx){
