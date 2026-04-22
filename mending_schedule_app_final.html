@@ -940,12 +940,22 @@ const SOK='mending-overrides-v2',FOK='mending-fri-overrides-v2',PTK='mending-nop
 // ── GitHub sync ───────────────────────────────────────────────
 const GH_KEY='mending-github-v1';
 const GH_FILE='schedule-data.json';
-let ghUser='',ghRepo='',ghToken='';
+// Public repo info — anyone can read schedule-data.json from here without a token
+// Token is only needed for writing (manager only, set in GitHub sync settings)
+const GH_PUBLIC_USER='kourtney-mend';
+const GH_PUBLIC_REPO='Mending-Member-Ops-Schedule';
+let ghUser=GH_PUBLIC_USER,ghRepo=GH_PUBLIC_REPO,ghToken='';
 
 function loadGitHubSettings(){
   try{
     const s=localStorage.getItem(GH_KEY);
-    if(s){const d=JSON.parse(s);ghUser=d.user||'';ghRepo=d.repo||'';ghToken=d.token||'';}
+    if(s){
+      const d=JSON.parse(s);
+      // Only override if explicitly saved — keeps public defaults for read-only viewers
+      if(d.user) ghUser=d.user;
+      if(d.repo) ghRepo=d.repo;
+      if(d.token) ghToken=d.token;
+    }
   }catch(e){}
 }
 
@@ -1026,14 +1036,14 @@ async function pushToGitHub(silent=false){
 }
 
 async function pullFromGitHub(){
-  if(!ghUser||!ghRepo||!ghToken) return false;
+  if(!ghUser||!ghRepo) return false;
   try{
-    const resp=await fetch(ghApiUrl(),{
-      headers:{'Authorization':`Bearer ${ghToken}`,'Accept':'application/vnd.github+json'}
-    });
+    // Use public raw URL — no token needed, anyone can read
+    // Add cache-bust so browser doesn't serve stale version
+    const rawUrl=`https://raw.githubusercontent.com/${ghUser}/${ghRepo}/main/${GH_FILE}?t=${Date.now()}`;
+    const resp=await fetch(rawUrl);
     if(!resp.ok) return false;
-    const d=await resp.json();
-    const raw=JSON.parse(decodeURIComponent(escape(atob(d.content.replace(/\n/g,'')))));
+    const raw=await resp.json();
     // Apply pulled data
     if(raw.schedOverrides) schedOverrides=raw.schedOverrides;
     if(raw.friOverrides) friOverrides=raw.friOverrides;
@@ -1041,7 +1051,7 @@ async function pullFromGitHub(){
     if(raw.noPT) noPT=raw.noPT;
     if(raw.noHoliday) noHoliday=raw.noHoliday;
     if(raw.ooo) ooo=raw.ooo;
-    // Also sync to localStorage so it's cached
+    // Cache to localStorage
     localStorage.setItem(SOK,JSON.stringify(schedOverrides));
     localStorage.setItem(FOK,JSON.stringify(friOverrides));
     localStorage.setItem(OK,JSON.stringify(noOB));
@@ -1112,7 +1122,8 @@ function load(){
   }catch(e){}
   renderAll();
   // If GitHub is configured, pull latest overrides in background
-  if(ghUser&&ghRepo&&ghToken){
+  // Only needs username + repo — no token required for reading
+  if(ghUser&&ghRepo){
     setSS('loading');
     pullFromGitHub().then(ok=>{
       if(ok){renderAll();}
