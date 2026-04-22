@@ -70,6 +70,7 @@ body { font-family: var(--font); background: var(--bg-tertiary); min-height: 100
 .tl-bar { display: flex; border-radius: var(--radius-md); overflow: hidden; border: 0.5px solid var(--border-light); position: relative; }
 .tl-block { display: flex; align-items: center; justify-content: center; font-weight: 500; cursor: pointer; overflow: hidden; white-space: nowrap; padding: 0 3px; transition: opacity 0.12s; }
 .tl-block:hover { opacity: 0.82; }
+#tl-hover-card { position:fixed; z-index:9999; background:var(--bg-primary); border:0.5px solid var(--border-mid); border-radius:var(--radius-md); padding:8px 12px; font-size:12px; font-family:var(--font); box-shadow:0 4px 16px rgba(0,0,0,0.12); pointer-events:none; display:none; min-width:140px; }
 .now-line { position: absolute; top: 0; bottom: 0; width: 2px; background: #E24B4A; pointer-events: none; z-index: 10; }
 .now-lbl { position: absolute; top: -14px; font-size: 9px; color: #E24B4A; transform: translateX(-50%); white-space: nowrap; font-weight: 500; }
 .cov-bar-wrap { margin-bottom: 1.25rem; }
@@ -115,6 +116,7 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
 </style>
 </head>
 <body>
+<div id="tl-hover-card"></div>
 <div class="container">
   <div class="app-header">
     <div><div class="app-title">Member Ops Schedule</div><div class="app-meta">Mending · Ebony (EST) · Marisa & Ky (CST) · Manager view in PST</div></div>
@@ -158,6 +160,12 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
         <div><label>Activity</label><select id="edit-activity"></select></div>
       </div>
       <div class="form-row"><div><label>New start time</label><input type="time" id="edit-start"></div><div><label>New end time</label><input type="time" id="edit-end"></div></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px;flex-wrap:wrap">
+        <span style="color:var(--text-tertiary)">Times in:</span>
+        <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="radio" name="edit-tz" value="EST" checked> EST</label>
+        <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="radio" name="edit-tz" value="CST"> CST</label>
+        <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="radio" name="edit-tz" value="PST"> PST</label>
+      </div>
       <input type="hidden" id="edit-orig-start">
       <input type="hidden" id="edit-week-offset">
       <div id="edit-fri-row" style="display:none;margin-bottom:10px"><label>Friday week</label><select id="edit-fri-week"><option value="1">AH Week 1</option><option value="2">AH Week 2</option><option value="3">AH Week 3</option></select></div>
@@ -172,6 +180,12 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
         <div><label>Activity</label><select id="add-activity"></select></div>
       </div>
       <div class="form-row"><div><label>Start time</label><input type="time" id="add-start"></div><div><label>End time</label><input type="time" id="add-end"></div></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px;flex-wrap:wrap">
+        <span style="color:var(--text-tertiary)">Times in:</span>
+        <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="radio" name="add-tz" value="EST" checked> EST</label>
+        <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="radio" name="add-tz" value="CST"> CST</label>
+        <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="radio" name="add-tz" value="PST"> PST</label>
+      </div>
       <div id="add-fri-row" style="display:none;margin-bottom:10px"><label>Friday week</label><select id="add-fri-week"><option value="1">AH Week 1</option><option value="2">AH Week 2</option><option value="3">AH Week 3</option></select></div>
       <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:10px" id="add-date-display"></div>
       <div class="btn-row"><button class="bp" onclick="addBlock()">Add block</button></div>
@@ -515,6 +529,12 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
           <div><label>Start</label><input type="time" id="builder-start"></div>
           <div><label>End</label><input type="time" id="builder-end"></div>
         </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:6px;margin-bottom:4px;font-size:12px;flex-wrap:wrap">
+          <span style="color:var(--text-tertiary)">Times in:</span>
+          <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="radio" name="builder-tz" value="EST" checked> EST</label>
+          <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="radio" name="builder-tz" value="CST"> CST</label>
+          <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="radio" name="builder-tz" value="PST"> PST</label>
+        </div>
         <button class="bs" onclick="builderAddBlock()" style="margin-top:4px">+ Add block</button>
       </div>
 
@@ -537,6 +557,16 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
   <div class="modal" style="max-width:360px">
     <div class="modal-title" id="bam-title">Edit block</div>
     <div id="bam-info" style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:1rem;font-size:13px"></div>
+
+    <!-- Timezone toggle (shared across edit/add panels) -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px;flex-wrap:wrap">
+      <span style="color:var(--text-tertiary)">Times in:</span>
+      <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="radio" name="bam-tz" value="agent" checked onchange="onBamTzChange()"> <span id="bam-tz-agent-label">Agent TZ</span></label>
+      <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="radio" name="bam-tz" value="EST" onchange="onBamTzChange()"> EST</label>
+      <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="radio" name="bam-tz" value="CST" onchange="onBamTzChange()"> CST</label>
+      <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="radio" name="bam-tz" value="PST" onchange="onBamTzChange()"> PST</label>
+      <span id="bam-tz-hint" style="color:var(--text-tertiary);font-size:11px"></span>
+    </div>
 
     <!-- Edit panel -->
     <div id="bam-edit-panel">
@@ -623,6 +653,12 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
       <div class="form-row">
         <div><label>From</label><input type="time" id="ooo-start" oninput="checkOooConflicts()" style="width:100%;font-size:13px;padding:7px 9px;border:0.5px solid var(--border-mid);border-radius:var(--radius-md);background:var(--bg-primary);color:var(--text-primary);font-family:var(--font)"></div>
         <div><label>To</label><input type="time" id="ooo-end" oninput="checkOooConflicts()" style="width:100%;font-size:13px;padding:7px 9px;border:0.5px solid var(--border-mid);border-radius:var(--radius-md);background:var(--bg-primary);color:var(--text-primary);font-family:var(--font)"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12px;flex-wrap:wrap">
+        <span style="color:var(--text-tertiary)">Times in:</span>
+        <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="radio" name="ooo-tz" value="EST" checked onchange="checkOooConflicts()"> EST</label>
+        <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="radio" name="ooo-tz" value="CST" onchange="checkOooConflicts()"> CST</label>
+        <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="radio" name="ooo-tz" value="PST" onchange="checkOooConflicts()"> PST</label>
       </div>
       <div id="ooo-conflict-warning" style="display:none;margin-top:10px;padding:10px 12px;background:#FAEEDA;border-radius:var(--radius-md);border:0.5px solid #FAC775">
         <div style="font-size:12px;font-weight:500;color:#633806;margin-bottom:6px">⚠ This window overlaps scheduled activities:</div>
@@ -771,7 +807,7 @@ const SK='mending-sched-v2',FK='mending-fri-v2',OK='mending-ob-v2',OOK='mending-
 
 function t2m(t){const[h,m]=t.split(':').map(Number);return h*60+m;}
 function m2t(m){m=((m%1440)+1440)%1440;return`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;}
-function m2d(m){m=((m%1440)+1440)%1440;const h=Math.floor(m/60),mn=m%60,ap=h>=12?'pm':'am',hh=h>12?h-12:(h===0?12:h);return`${hh}${mn?':'+String(mn).padStart(2,'0'):''}${ap}`;}
+function m2d(m){m=((m%1440)+1440)%1440;const h=Math.floor(m/60),mn=m%60,ap=h>=12?'pm':'am',hh=h>12?h-12:(h===0?12:h);return`${hh}:${String(mn).padStart(2,'0')}${ap}`;}
 
 const BASE={
   Ebony:{
@@ -955,14 +991,16 @@ function toggleOOO(agent,dateStr){
 }
 
 function onOooTypeChange(){
-  const type=document.querySelector('input[name="ooo-type"]:checked').value;
+  const type=document.querySelector('input[name="ooo-type"]:checked')?.value||'full';
   document.getElementById('ooo-partial-fields').style.display=type==='partial'?'block':'none';
   document.getElementById('ooo-conflict-warning').style.display='none';
 }
 
 function checkOooConflicts(){
-  const start=document.getElementById('ooo-start').value;
-  const end=document.getElementById('ooo-end').value;
+  if(!_oooContext.agent) return;
+  const agentTZ=ATZ[_oooContext.agent];
+  const start=getTimeInAgentTZ('ooo-start','ooo-tz',agentTZ);
+  const end=getTimeInAgentTZ('ooo-end','ooo-tz',agentTZ);
   if(!start||!end||t2m(end)<=t2m(start)) return;
   const{agent,day,fw}=_oooContext;
   const blocks=getRawBlocks(agent,day,fw);
@@ -984,7 +1022,7 @@ function checkOooConflicts(){
 }
 
 function applyOOO(){
-  const type=document.querySelector('input[name="ooo-type"]:checked').value;
+  const type=document.querySelector('input[name="ooo-type"]:checked')?.value||'full';
   const{agent,dateStr,day,fw}=_oooContext;
   if(!ooo[agent])ooo[agent]={};
 
@@ -996,8 +1034,9 @@ function applyOOO(){
   }
 
   // Partial OOO
-  const start=document.getElementById('ooo-start').value;
-  const end=document.getElementById('ooo-end').value;
+  const agentTZ=ATZ[agent];
+  const start=getTimeInAgentTZ('ooo-start','ooo-tz',agentTZ);
+  const end=getTimeInAgentTZ('ooo-end','ooo-tz',agentTZ);
   if(!start||!end){alert('Please enter a start and end time.');return;}
   if(t2m(end)<=t2m(start)){alert('End time must be after start time.');return;}
 
@@ -1350,9 +1389,11 @@ function buildDragBar(blocks,agent,day,fw){
     const s=t2m(b[1]),e=t2m(b[2]),w=((e-s)/tot*100).toFixed(2);
     const c=COLORS[b[0]]||{bg:'#D3D1C7',text:'#444441'};
     const lbl=getLabel(b[0],parseFloat(w));
+    const pstOff=getTZOffsetMins('PST'),agentOff=getTZOffsetMins(tz),diff=pstOff-agentOff;
+    const pstS=m2d(s+diff),pstE=m2d(e+diff);
     html+=`<div class="tl-block drag-block" data-agent="${agent}" data-day="${day}" data-fw="${fw}" data-idx="${i}"
       style="width:${w}%;background:${c.bg};color:${c.text};font-size:10px;position:relative;cursor:grab;user-select:none"
-      title="${b[0]}: ${m2d(s)}–${m2d(e)} ${tz}"
+      data-hover="${b[0]} | ${m2d(s)}–${m2d(e)} ${tz} | PST: ${pstS}–${pstE}"
       onclick="openBlockAction(event,'${agent}','${day}',${fw},${i})">
       <span style="pointer-events:none;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%;display:block;text-align:center">${lbl}</span>
       <div class="drag-handle-right" data-agent="${agent}" data-day="${day}" data-fw="${fw}" data-idx="${i}"
@@ -1374,7 +1415,7 @@ function buildPSTBar(blocks,agent,tz){
   pst.forEach(b=>{
     const s=t2m(b[1]),e=t2m(b[2]),w=((e-s)/tot*100).toFixed(2);
     const c=COLORS[b[0]]||{bg:'#D3D1C7',text:'#444441'};
-    html+=`<div style="width:${w}%;background:${c.bg};display:flex;align-items:center;justify-content:center;font-size:9px;color:${c.text};overflow:hidden;white-space:nowrap;padding:0 2px"></div>`;
+    html+=`<div class="tl-block" style="width:${w}%;background:${c.bg};display:flex;align-items:center;justify-content:center;font-size:9px;color:${c.text};overflow:hidden;white-space:nowrap;padding:0 2px" title="${b[0]} | ${m2d(s)}–${m2d(e)} PST"></div>`;
   });
   if(inDay){const pct=((nowM-bS)/tot*100).toFixed(2);html+=`<div class="now-line" style="left:${pct}%"></div>`;}
   html+=`</div>`;
@@ -1738,7 +1779,7 @@ function renderAgent(){
     const bS=Math.min(...blocks.map(b=>t2m(b[1]))),bE=Math.max(...blocks.map(b=>t2m(b[2]))),tot=bE-bS;
     const nowM=nowFor(tz),inDay=nowM>=bS&&nowM<=bE;
     let h=`<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-tertiary);margin-bottom:2px"><span>${m2d(bS)} <span style="opacity:0.6">${tz}</span></span><span>${m2d(bE)} <span style="opacity:0.6">${tz}</span></span></div><div class="tl-bar" style="height:42px;${isOOO?'opacity:0.4':''}">`;
-    blocks.forEach(b=>{const s=t2m(b[1]),e=t2m(b[2]),w=((e-s)/tot*100).toFixed(2),c=COLORS[b[0]]||{bg:'#D3D1C7',text:'#444441'},lbl=getLabel(b[0],parseFloat(w));h+=`<div class="tl-block" style="width:${w}%;background:${c.bg};color:${c.text};font-size:10px" title="${b[0]}: ${m2d(s)}–${m2d(e)} ${tz}" onclick="clickBlock('${aView}','${aDay}',${s},${e},'${b[0]}',${aFW})"><span style="pointer-events:none;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%;display:block;text-align:center">${lbl}</span></div>`;});
+    blocks.forEach(b=>{const s=t2m(b[1]),e=t2m(b[2]),w=((e-s)/tot*100).toFixed(2),c=COLORS[b[0]]||{bg:'#D3D1C7',text:'#444441'},lbl=getLabel(b[0],parseFloat(w));h+=`<div class="tl-block" style="width:${w}%;background:${c.bg};color:${c.text};font-size:10px" data-hover="${b[0]}: ${m2d(s)}–${m2d(e)} ${tz}" onclick="clickBlock('${aView}','${aDay}',${s},${e},'${b[0]}',${aFW})"><span style="pointer-events:none;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%;display:block;text-align:center">${lbl}</span></div>`;});
     if(inDay){const pct=((nowM-bS)/tot*100).toFixed(2);h+=`<div class="now-line" style="left:${pct}%"><span class="now-lbl">now</span></div>`;}
     tWrap.innerHTML=h+`</div>`;
   }
@@ -1823,8 +1864,11 @@ function applyEdit(){
   const agent=document.getElementById('edit-agent').value;
   const day=document.getElementById('edit-day').value;
   const act=document.getElementById('edit-activity').value;
-  const ns=document.getElementById('edit-start').value;
-  const ne=document.getElementById('edit-end').value;
+  const agentTZ=ATZ[agent];
+  const rawNs=document.getElementById('edit-start').value;
+  const rawNe=document.getElementById('edit-end').value;
+  const ns=getTimeInAgentTZ('edit-start','edit-tz',agentTZ);
+  const ne=getTimeInAgentTZ('edit-end','edit-tz',agentTZ);
   const origStart=document.getElementById('edit-orig-start').value;
   const editWO=parseInt(document.getElementById('edit-week-offset').value);
   if(!ns||!ne){alert('Please fill in start and end times.');return;}
@@ -1888,7 +1932,9 @@ function commitEdit(agent,day,act,ns,ne,fw,delta,origStart,editWO){
 }
 function addBlock(){
   const agent=document.getElementById('add-agent').value,day=document.getElementById('add-day').value,act=document.getElementById('add-activity').value;
-  const s=document.getElementById('add-start').value,e=document.getElementById('add-end').value;
+  const agentTZ=ATZ[agent];
+  const s=getTimeInAgentTZ('add-start','add-tz',agentTZ);
+  const e=getTimeInAgentTZ('add-end','add-tz',agentTZ);
   if(!s||!e){alert('Please fill in start and end times.');return;}
   const fw=parseInt(document.getElementById('add-fri-week').value);
   const dateStr=toISO(dateOfDay(day,weekOffset));
@@ -2074,8 +2120,10 @@ function onBuilderChange(){
 
 function builderAddBlock(){
   const act=document.getElementById('builder-act').value;
-  const s=document.getElementById('builder-start').value;
-  const e=document.getElementById('builder-end').value;
+  const agent=document.getElementById('builder-agent').value;
+  const agentTZ=ATZ[agent];
+  const s=getTimeInAgentTZ('builder-start','builder-tz',agentTZ);
+  const e=getTimeInAgentTZ('builder-end','builder-tz',agentTZ);
   if(!s||!e){alert('Please enter start and end times.');return;}
   if(t2m(e)<=t2m(s)){alert('End time must be after start time.');return;}
   builderBlocks.push([act,s,e]);
@@ -2282,6 +2330,10 @@ function openAddBlock(e,agent,day,fw){
   document.getElementById('bam-add-end').value=suggestEnd;
   document.getElementById('bam-add-act').value='On Phones';
   bamShowAdd();
+  // Reset TZ toggle to agent TZ
+  document.querySelector('input[name="bam-tz"][value="agent"]').checked=true;
+  document.getElementById('bam-tz-agent-label').textContent=ATZ[agent];
+  document.getElementById('bam-tz-hint').textContent='';
   document.getElementById('block-action-modal').classList.add('open');
 }
 
@@ -2366,8 +2418,8 @@ function bamResetDay(){
 let _huddlePending=null; // {agent,day,fw,blocks,huddleStart,huddleEnd,conflictBlock}
 
 function bamSaveAdd(){
-  const ns=document.getElementById('bam-add-start').value;
-  const ne=document.getElementById('bam-add-end').value;
+  const ns=bamGetAgentTime('bam-add-start');
+  const ne=bamGetAgentTime('bam-add-end');
   const act=document.getElementById('bam-add-act').value;
   if(!ns||!ne){alert('Please enter start and end times.');return;}
   if(t2m(ne)<=t2m(ns)){alert('End time must be after start time.');return;}
@@ -2413,7 +2465,7 @@ function applyHuddleConflict(){
   if(!_huddlePending) return;
   const{agent,day,fw,blocks,huddleStart,huddleEnd,conflictBlock}=_huddlePending;
   _huddlePending=null;
-  const action=document.querySelector('input[name="hcm-action"]:checked').value;
+  const action=document.querySelector('input[name="hcm-action"]:checked')?.value||'split';
   const hs=t2m(huddleStart),he=t2m(huddleEnd),huddleDur=he-hs;
   let newBlocks;
 
@@ -2525,6 +2577,10 @@ function openBlockAction(e,agent,day,fw,idx){
   ).join('');
 
   bamShowEdit();
+  // Reset TZ toggle to agent TZ
+  document.querySelector('input[name="bam-tz"][value="agent"]').checked=true;
+  document.getElementById('bam-tz-agent-label').textContent=tz;
+  document.getElementById('bam-tz-hint').textContent='';
   document.getElementById('block-action-modal').classList.add('open');
 }
 
@@ -2539,9 +2595,68 @@ function bamShowDelete(){
   document.getElementById('bam-add-panel').style.display='none';
 }
 
+// ── BAM timezone toggle ──────────────────────────────────────
+// ── General timezone conversion for manager time inputs ──────
+// Converts a time string from a selected TZ to agent's TZ
+function convertToAgentTZ(timeStr, fromTZ, agentTZ){
+  if(!timeStr) return timeStr;
+  if(fromTZ===agentTZ) return timeStr;
+  const fromOff=getTZOffsetMins(fromTZ);
+  const toOff=getTZOffsetMins(agentTZ);
+  return m2t(t2m(timeStr)+(toOff-fromOff));
+}
+
+// Get the selected TZ from a named radio group
+function getSelectedTZ(groupName){
+  const el=document.querySelector(`input[name="${groupName}"]:checked`);
+  return el?el.value:'EST';
+}
+
+// Read a time input and convert to agent TZ based on a radio group selection
+function getTimeInAgentTZ(inputId, tzGroupName, agentTZ){
+  const val=document.getElementById(inputId)?.value;
+  if(!val) return val;
+  const selectedTZ=getSelectedTZ(tzGroupName);
+  return convertToAgentTZ(val, selectedTZ, agentTZ);
+}
+
+// Render a TZ radio group (shared HTML snippet)
+function tzPickerHTML(groupName, hint=''){
+  return`<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px;flex-wrap:wrap">
+    <span style="color:var(--text-tertiary)">Times in:</span>
+    <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="radio" name="${groupName}" value="EST" checked> EST</label>
+    <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="radio" name="${groupName}" value="CST"> CST</label>
+    <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="radio" name="${groupName}" value="PST"> PST</label>
+    ${hint?`<span style="color:var(--text-tertiary);font-size:11px">${hint}</span>`:''}
+  </div>`;
+}
+
+// ── Block action modal TZ (kept for backward compat) ─────────
+function bamTzIsAgent(){
+  const el=document.querySelector('input[name="bam-tz"]:checked');
+  return !el||el.value==='agent';
+}
+
+function onBamTzChange(){
+  const tz=ATZ[bam.agent]||'EST';
+  const sel=getSelectedTZ('bam-tz');
+  document.getElementById('bam-tz-agent-label').textContent=tz;
+  document.getElementById('bam-tz-hint').textContent=
+    sel!=='agent'?`(will save as ${tz})`:'';
+}
+
+function bamGetAgentTime(inputId){
+  const val=document.getElementById(inputId)?.value;
+  if(!val||!bam.agent) return val;
+  const agentTZ=ATZ[bam.agent];
+  const sel=document.querySelector('input[name="bam-tz"]:checked')?.value||'agent';
+  if(sel==='agent') return val;
+  return convertToAgentTZ(val, sel, agentTZ);
+}
+
 function bamSaveEdit(){
-  const ns=document.getElementById('bam-start').value;
-  const ne=document.getElementById('bam-end').value;
+  const ns=bamGetAgentTime('bam-start');
+  const ne=bamGetAgentTime('bam-end');
   const act=document.getElementById('bam-act').value;
   if(!ns||!ne){alert('Please enter start and end times.');return;}
   if(t2m(ne)<=t2m(ns)){alert('End time must be after start time.');return;}
@@ -3163,6 +3278,12 @@ function renderReviewList(){
             <input type="time" id="place-start-${r.id}" style="font-size:13px;padding:5px 8px;border:0.5px solid var(--border-mid);border-radius:var(--radius-md);background:var(--bg-primary);color:var(--text-primary);font-family:var(--font)">
             <span style="font-size:11px;color:var(--text-tertiary)">End auto-calculated · leave blank to approve without placing</span>
           </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12px;flex-wrap:wrap">
+            <span style="color:var(--text-tertiary)">Times in:</span>
+            <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="radio" name="place-tz-${r.id}" value="EST" checked> EST</label>
+            <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="radio" name="place-tz-${r.id}" value="CST"> CST</label>
+            <label style="display:flex;align-items:center;gap:3px;cursor:pointer"><input type="radio" name="place-tz-${r.id}" value="PST"> PST</label>
+          </div>
         </div>
         <div style="margin-bottom:8px">
           <input type="text" placeholder="Optional note to agent..." id="mgr-note-${r.id}" style="width:100%;font-size:12px;padding:6px 9px;border:0.5px solid var(--border-mid);border-radius:var(--radius-md);background:var(--bg-primary);color:var(--text-primary);font-family:var(--font)">
@@ -3272,7 +3393,9 @@ function resolveTimeRequest(id,status){
   req.resolvedAt=new Date().toISOString();
 
   if(status==='approved'){
-    const startTime=startEl?startEl.value:'';
+    const agentTZ=ATZ[req.agent];
+    const rawStart=startEl?startEl.value:'';
+    const startTime=rawStart?convertToAgentTZ(rawStart,getSelectedTZ(`place-tz-${id}`),agentTZ):'';
     const d=new Date(req.date+'T12:00:00');
     const dayName=d.toLocaleDateString('en-US',{weekday:'long'});
     const applyDates=[];
@@ -3771,8 +3894,60 @@ function isToday(day,wo){
   return toISO(dateOfDay(day,wo))===toISO(new Date());
 }
 
-setSS('loading');populateSelects();buildLegend();load();loadRequests();loadSlackSettings();
+// ── Timeline hover card ───────────────────────────────────────
+(function(){
+  const card=document.getElementById('tl-hover-card');
+  let hideTimer=null;
+
+  function showCard(e,html){
+    clearTimeout(hideTimer);
+    card.innerHTML=html;
+    card.style.display='block';
+    positionCard(e);
+  }
+
+  function positionCard(e){
+    const margin=12;
+    const cw=card.offsetWidth||200,ch=card.offsetHeight||60;
+    let x=e.clientX+margin,y=e.clientY-ch-margin;
+    if(x+cw>window.innerWidth) x=e.clientX-cw-margin;
+    if(y<0) y=e.clientY+margin;
+    card.style.left=x+'px';
+    card.style.top=y+'px';
+  }
+
+  document.addEventListener('mousemove',e=>{
+    if(card.style.display==='block') positionCard(e);
+  });
+
+  document.addEventListener('mouseover',e=>{
+    const block=e.target.closest('.tl-block');
+    if(!block) return;
+    const title=block.getAttribute('data-hover')||block.title;
+    if(!title) return;
+    // Format: "ActivityName | AgentTZ: 9:00am–10:00am TZ [| PST: 6:00am–7:00am]"
+    const parts=title.split(' | ');
+    const actPart=parts[0].trim();
+    const agentLine=parts[1]?parts[1].trim():'';
+    const pstLine=parts[2]?parts[2].trim():'';
+    const c=COLORS[actPart]||{bg:'#D3D1C7',text:'#444441'};
+    let html=`<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+      <div style="width:10px;height:10px;border-radius:2px;flex-shrink:0;background:${c.bg}"></div>
+      <strong>${actPart}</strong>
+    </div>`;
+    if(agentLine) html+=`<div style="color:var(--text-secondary);font-size:12px">${agentLine}</div>`;
+    if(pstLine) html+=`<div style="color:var(--text-tertiary);font-size:11px;margin-top:2px">${pstLine}</div>`;
+    showCard(e,html);
+  });
+
+  document.addEventListener('mouseout',e=>{
+    const block=e.target.closest('.tl-block');
+    if(!block) return;
+    hideTimer=setTimeout(()=>{card.style.display='none';},80);
+  });
+})();
 setInterval(()=>{renderManager();renderAgent();},60000);
 </script>
+
 </body>
 </html>
