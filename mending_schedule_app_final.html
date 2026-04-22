@@ -394,8 +394,41 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
       <div style="font-size:13px;color:var(--text-secondary)" id="review-summary"></div>
       <div style="display:flex;gap:8px">
+        <button class="bs" onclick="toggleGitHubSettings()" style="font-size:12px">☁ GitHub sync</button>
         <button class="bs" onclick="toggleSlackSettings()" style="font-size:12px">⚙ Slack settings</button>
         <button class="bs" onclick="reqClearAll()" style="font-size:12px">Clear all resolved</button>
+      </div>
+    </div>
+
+    <!-- GitHub sync settings panel -->
+    <div id="github-settings-panel" style="display:none;margin-bottom:1rem">
+      <div class="card" style="margin-bottom:0">
+        <div class="card-title" style="margin-bottom:.5rem">☁ GitHub sync</div>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:1rem">
+          Connect to your GitHub repo so schedule changes are shared with your whole team. Everyone sees your updates after refreshing the page.
+        </p>
+        <div style="margin-bottom:8px">
+          <label>GitHub username</label>
+          <input type="text" id="gh-user" placeholder="e.g. kourtney-mend"
+            style="width:100%;font-size:13px;padding:7px 9px;border:0.5px solid var(--border-mid);border-radius:var(--radius-md);background:var(--bg-primary);color:var(--text-primary);font-family:var(--font);margin-top:4px">
+        </div>
+        <div style="margin-bottom:8px">
+          <label>Repository name</label>
+          <input type="text" id="gh-repo" placeholder="e.g. Mending-Member-Ops-Schedule"
+            style="width:100%;font-size:13px;padding:7px 9px;border:0.5px solid var(--border-mid);border-radius:var(--radius-md);background:var(--bg-primary);color:var(--text-primary);font-family:var(--font);margin-top:4px">
+        </div>
+        <div style="margin-bottom:12px">
+          <label>Personal Access Token</label>
+          <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+            style="width:100%;font-size:13px;padding:7px 9px;border:0.5px solid var(--border-mid);border-radius:var(--radius-md);background:var(--bg-primary);color:var(--text-primary);font-family:var(--font);margin-top:4px">
+          <div style="font-size:11px;color:var(--text-tertiary);margin-top:4px">Stored in your browser only — never sent anywhere except GitHub's API.</div>
+        </div>
+        <div class="btn-row">
+          <button class="bp" onclick="saveGitHubSettings()">Save</button>
+          <button class="bs" onclick="testGitHubSync()">Test connection</button>
+          <button class="bs" onclick="pushToGitHub()">Push now</button>
+        </div>
+        <div id="gh-status" style="font-size:12px;margin-top:8px"></div>
       </div>
     </div>
 
@@ -900,6 +933,137 @@ function getFriWeekForDate(d){
 let mDay='Monday',mFW=gfw(tf),aView='Ebony',aDay='Monday',aFW=gfw(tf),cDay='Monday',cFW=gfw(tf);
 
 const SOK='mending-overrides-v2',FOK='mending-fri-overrides-v2',PTK='mending-nopt-v2',HK='mending-holiday-v2';
+// ── GitHub sync ───────────────────────────────────────────────
+const GH_KEY='mending-github-v1';
+const GH_FILE='schedule-data.json';
+let ghUser='',ghRepo='',ghToken='';
+
+function loadGitHubSettings(){
+  try{
+    const s=localStorage.getItem(GH_KEY);
+    if(s){const d=JSON.parse(s);ghUser=d.user||'';ghRepo=d.repo||'';ghToken=d.token||'';}
+  }catch(e){}
+}
+
+function saveGitHubSettings(){
+  ghUser=document.getElementById('gh-user').value.trim();
+  ghRepo=document.getElementById('gh-repo').value.trim();
+  ghToken=document.getElementById('gh-token').value.trim();
+  localStorage.setItem(GH_KEY,JSON.stringify({user:ghUser,repo:ghRepo,token:ghToken}));
+  document.getElementById('gh-status').innerHTML='<span style="color:#27500A">✓ Settings saved</span>';
+}
+
+function toggleGitHubSettings(){
+  const panel=document.getElementById('github-settings-panel');
+  const isOpen=panel.style.display!=='none';
+  panel.style.display=isOpen?'none':'block';
+  if(!isOpen){
+    document.getElementById('gh-user').value=ghUser;
+    document.getElementById('gh-repo').value=ghRepo;
+    document.getElementById('gh-token').value=ghToken;
+    document.getElementById('gh-status').textContent='';
+  }
+}
+
+function ghApiUrl(){
+  return `https://api.github.com/repos/${ghUser}/${ghRepo}/contents/${GH_FILE}`;
+}
+
+function buildGHPayload(){
+  return{
+    schedOverrides,friOverrides,noOB,noPT,noHoliday,ooo,
+    _saved:new Date().toISOString()
+  };
+}
+
+async function pushToGitHub(silent=false){
+  if(!ghUser||!ghRepo||!ghToken){
+    if(!silent) document.getElementById('gh-status').innerHTML='<span style="color:#A32D2D">✗ Please fill in all GitHub settings first.</span>';
+    return false;
+  }
+  const statusEl=document.getElementById('gh-status');
+  if(!silent) statusEl.innerHTML='<span style="color:#BA7517">Pushing to GitHub...</span>';
+
+  try{
+    // Get current SHA (needed to update existing file)
+    let sha='';
+    const getResp=await fetch(ghApiUrl(),{
+      headers:{'Authorization':`Bearer ${ghToken}`,'Accept':'application/vnd.github+json'}
+    });
+    if(getResp.ok){const d=await getResp.json();sha=d.sha||'';}
+
+    // Push new data
+    const content=btoa(unescape(encodeURIComponent(JSON.stringify(buildGHPayload(),null,2))));
+    const body={message:'Schedule update',content};
+    if(sha) body.sha=sha;
+
+    const putResp=await fetch(ghApiUrl(),{
+      method:'PUT',
+      headers:{'Authorization':`Bearer ${ghToken}`,'Accept':'application/vnd.github+json','Content-Type':'application/json'},
+      body:JSON.stringify(body)
+    });
+    if(putResp.ok){
+      if(!silent) statusEl.innerHTML='<span style="color:#27500A">✓ Pushed! Team will see changes on next refresh.</span>';
+      return true;
+    } else {
+      const err=await putResp.json();
+      if(!silent) statusEl.innerHTML=`<span style="color:#A32D2D">✗ GitHub error: ${err.message||putResp.status}</span>`;
+      return false;
+    }
+  }catch(e){
+    if(!silent) statusEl.innerHTML=`<span style="color:#A32D2D">✗ Error: ${e.message}</span>`;
+    return false;
+  }
+}
+
+async function pullFromGitHub(){
+  if(!ghUser||!ghRepo||!ghToken) return false;
+  try{
+    const resp=await fetch(ghApiUrl(),{
+      headers:{'Authorization':`Bearer ${ghToken}`,'Accept':'application/vnd.github+json'}
+    });
+    if(!resp.ok) return false;
+    const d=await resp.json();
+    const raw=JSON.parse(decodeURIComponent(escape(atob(d.content.replace(/\n/g,'')))));
+    // Apply pulled data
+    if(raw.schedOverrides) schedOverrides=raw.schedOverrides;
+    if(raw.friOverrides) friOverrides=raw.friOverrides;
+    if(raw.noOB) noOB=raw.noOB;
+    if(raw.noPT) noPT=raw.noPT;
+    if(raw.noHoliday) noHoliday=raw.noHoliday;
+    if(raw.ooo) ooo=raw.ooo;
+    // Also sync to localStorage so it's cached
+    localStorage.setItem(SOK,JSON.stringify(schedOverrides));
+    localStorage.setItem(FOK,JSON.stringify(friOverrides));
+    localStorage.setItem(OK,JSON.stringify(noOB));
+    localStorage.setItem(PTK,JSON.stringify(noPT));
+    localStorage.setItem(HK,JSON.stringify(noHoliday));
+    localStorage.setItem(OOK,JSON.stringify(ooo));
+    return true;
+  }catch(e){return false;}
+}
+
+async function testGitHubSync(){
+  const statusEl=document.getElementById('gh-status');
+  // Save settings from fields first
+  ghUser=document.getElementById('gh-user').value.trim();
+  ghRepo=document.getElementById('gh-repo').value.trim();
+  ghToken=document.getElementById('gh-token').value.trim();
+  if(!ghUser||!ghRepo||!ghToken){statusEl.innerHTML='<span style="color:#A32D2D">✗ Fill in all fields first.</span>';return;}
+  statusEl.innerHTML='<span style="color:#BA7517">Testing...</span>';
+  try{
+    const resp=await fetch(`https://api.github.com/repos/${ghUser}/${ghRepo}`,{
+      headers:{'Authorization':`Bearer ${ghToken}`,'Accept':'application/vnd.github+json'}
+    });
+    if(resp.ok){
+      statusEl.innerHTML='<span style="color:#27500A">✓ Connected! Repository found. Save settings then click "Push now" to sync.</span>';
+    } else {
+      const e=await resp.json();
+      statusEl.innerHTML=`<span style="color:#A32D2D">✗ ${e.message||'Could not connect. Check your token and repo name.'}</span>`;
+    }
+  }catch(e){statusEl.innerHTML=`<span style="color:#A32D2D">✗ Network error: ${e.message}</span>`;}
+}
+
 function save(){
   setSS('saving');
   try{
@@ -913,8 +1077,14 @@ function save(){
     localStorage.setItem(HK,JSON.stringify(noHoliday));
     setSS('saved');
   }catch(e){setSS('error');}
+  // Push to GitHub in background if configured
+  if(ghUser&&ghRepo&&ghToken){
+    setSS('saving');
+    pushToGitHub(true).then(ok=>setSS(ok?'saved':'saved')); // don't show error on auto-push
+  }
 }
 function load(){
+  // Load base schedule from localStorage first (instant)
   try{
     const s=localStorage.getItem(SK),f=localStorage.getItem(FK),o=localStorage.getItem(OK),
           oo=localStorage.getItem(OOK),so=localStorage.getItem(SOK),fo=localStorage.getItem(FOK),
@@ -927,9 +1097,18 @@ function load(){
     if(fo)friOverrides=JSON.parse(fo);
     if(pt)noPT=JSON.parse(pt);
     if(hol)noHoliday=JSON.parse(hol);
-    setSS('saved');
-  }catch(e){setSS('saved');}
+  }catch(e){}
   renderAll();
+  // If GitHub is configured, pull latest overrides in background
+  if(ghUser&&ghRepo&&ghToken){
+    setSS('loading');
+    pullFromGitHub().then(ok=>{
+      if(ok){renderAll();}
+      setSS('saved');
+    });
+  } else {
+    setSS('saved');
+  }
 }
 function setSS(st){
   const dot=document.getElementById('save-dot'),txt=document.getElementById('save-text');
@@ -3943,7 +4122,7 @@ function isToday(day,wo){
     hideTimer=setTimeout(()=>{card.style.display='none';},80);
   });
 })();
-setSS('loading');populateSelects();buildLegend();load();loadRequests();loadSlackSettings();
+setSS('loading');populateSelects();buildLegend();loadGitHubSettings();load();loadRequests();loadSlackSettings();
 setInterval(()=>{renderManager();renderAgent();},60000);
 </script>
 
