@@ -135,6 +135,10 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
   <div id="view-manager" class="view active">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
       <button onclick="openCopyModal()" style="font-size:12px;padding:4px 12px;border:0.5px solid var(--border-light);border-radius:var(--radius-md);background:transparent;cursor:pointer;color:var(--text-secondary);font-family:var(--font)">Copy from prev week</button>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button onclick="sendTodaySchedules()" id="send-schedules-btn" style="font-size:12px;padding:4px 12px;border:0.5px solid var(--border-light);border-radius:var(--radius-md);background:transparent;cursor:pointer;color:var(--text-secondary);font-family:var(--font)">📅 Send today's schedules</button>
+        <span id="send-schedules-status" style="font-size:11px;color:var(--text-tertiary)"></span>
+      </div>
     </div>
     <div class="day-select" id="mgr-days"></div>
     <div id="mgr-alert"></div>
@@ -3085,6 +3089,94 @@ function notifyAgentScheduleChange(agent,dateStr,blocks){
   const blockLines=blocks.map(b=>`• ${b[0]}: ${m2d(t2m(b[1]))}–${m2d(t2m(b[2]))} ${tz}`).join('\n');
   const text=`:calendar: *Your schedule has been updated for ${dateDisp}*\n\n${blockLines}\n\n_Questions? Reach out to ${slackManagerName||'your manager'}._`;
   sendSlackNotification(webhook,{_raw:text});
+}
+
+async function sendTodaySchedules(){
+  const btn=document.getElementById('send-schedules-btn');
+  const statusEl=document.getElementById('send-schedules-status');
+
+  // Check if any agent webhooks are configured
+  const configured=AGENTS.filter(a=>slackAgentWebhooks[a]);
+  if(!configured.length){
+    statusEl.innerHTML='<span style="color:#A32D2D">No agent webhooks set up. Go to Review requests → ⚙ Slack settings.</span>';
+    setTimeout(()=>statusEl.textContent='',4000);
+    return;
+  }
+
+  btn.disabled=true;
+  statusEl.innerHTML='<span style="color:#BA7517">Sending...</span>';
+
+  const todayStr=toISO(new Date());
+  const d=new Date(todayStr+'T12:00:00');
+  const dayName=d.toLocaleDateString('en-US',{weekday:'long'});
+  const dateDisp=d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+
+  // Only send on weekdays
+  if(!DAYS.includes(dayName)){
+    statusEl.innerHTML='<span style="color:#BA7517">No schedule to send — today is not a work day.</span>';
+    btn.disabled=false;
+    setTimeout(()=>statusEl.textContent='',4000);
+    return;
+  }
+
+  let sent=0, skipped=0;
+  for(const agent of AGENTS){
+    const webhook=slackAgentWebhooks[agent];
+    if(!webhook){skipped++;continue;}
+
+    const tz=ATZ[agent];
+    // Find weekOffset for today
+    let wo=0;
+    for(let w=-1;w<=1;w++){if(toISO(dateOfDay(dayName,w))===todayStr){wo=w;break;}}
+    const savedWO=weekOffset;
+    weekOffset=wo;
+    const fw=dayName==='Friday'?getFriWeekForDate(d):1;
+    const blocks=gBlocks(agent,dayName,fw);
+    weekOffset=savedWO;
+
+    // Check if OOO
+    const isOOO=ooo[agent]&&ooo[agent][todayStr]===true;
+    if(isOOO){
+      const text=`:beach_with_umbrella: *${agent} — ${dateDisp}*\nYou're marked OOO today. Enjoy your day off!`;
+      await sendSlackNotification(webhook,{_raw:text});
+      sent++;
+      continue;
+    }
+
+    if(!blocks.length){skipped++;continue;}
+
+    // Format schedule
+    const shiftStart=m2d(Math.min(...blocks.map(b=>t2m(b[1]))));
+    const shiftEnd=m2d(Math.max(...blocks.map(b=>t2m(b[2]))));
+    const lines=blocks.map(b=>{
+      const c=COLORS[b[0]]||{bg:'#D3D1C7',text:'#444441'};
+      const dur=t2m(b[2])-t2m(b[1]);
+      const durLabel=dur>=60?`${Math.floor(dur/60)}h${dur%60?` ${dur%60}m`:''}`:dur+'m';
+      return`• *${b[0]}* — ${m2d(t2m(b[1]))}–${m2d(t2m(b[2]))} _(${durLabel})_`;
+    }).join('\n');
+
+    // Add any active flags
+    const flags=[];
+    if(noOB[todayStr]&&noOB[todayStr][agent]) flags.push('No Outbound today');
+    if(noPT[todayStr]&&noPT[todayStr][agent]) flags.push('No Project Time today');
+    if(noHoliday[todayStr]&&noHoliday[todayStr][agent]) flags.push('Holiday schedule');
+    if(ooo[agent]&&ooo[agent][todayStr]&&typeof ooo[agent][todayStr]==='object'){
+      const p=ooo[agent][todayStr];
+      flags.push(`Partial OOO ${m2d(t2m(p.start))}–${m2d(t2m(p.end))}`);
+    }
+    const flagLine=flags.length?`\n_${flags.join(' · ')}_`:'';
+
+    const text=`:calendar: *${agent} — ${dateDisp}*\nShift: *${shiftStart}–${shiftEnd} ${tz}*${flagLine}\n\n${lines}\n\nHave a great day! 👋`;
+    await sendSlackNotification(webhook,{_raw:text});
+    sent++;
+  }
+
+  btn.disabled=false;
+  const msg=skipped===AGENTS.length
+    ?'No agent webhooks configured — set them up in Slack settings.'
+    :`✓ Sent to ${sent} agent${sent!==1?'s':''}${skipped?`, ${skipped} skipped (no webhook)`:''}`;
+  statusEl.innerHTML=`<span style="color:${sent>0?'#27500A':'#BA7517'}">${msg}</span>`;
+  setTimeout(()=>statusEl.textContent='',6000);
 }
 
 async function sendSlackNotification(webhookUrl,req){
