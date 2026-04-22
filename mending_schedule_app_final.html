@@ -985,18 +985,21 @@ async function pushToGitHub(silent=false){
     if(!silent) document.getElementById('gh-status').innerHTML='<span style="color:#A32D2D">✗ Please fill in all GitHub settings first.</span>';
     return false;
   }
+  // Prevent concurrent pushes — if one is already running, skip (debounce handles retry)
+  if(pushToGitHub._running){return false;}
+  pushToGitHub._running=true;
   const statusEl=document.getElementById('gh-status');
   if(!silent) statusEl.innerHTML='<span style="color:#BA7517">Pushing to GitHub...</span>';
 
   try{
-    // Get current SHA (needed to update existing file)
+    // Always fetch fresh SHA immediately before writing to avoid collisions
     let sha='';
     const getResp=await fetch(ghApiUrl(),{
       headers:{'Authorization':`Bearer ${ghToken}`,'Accept':'application/vnd.github+json'}
     });
     if(getResp.ok){const d=await getResp.json();sha=d.sha||'';}
 
-    // Push new data
+    // Push latest data (captured at push time, not when save() was called)
     const content=btoa(unescape(encodeURIComponent(JSON.stringify(buildGHPayload(),null,2))));
     const body={message:'Schedule update',content};
     if(sha) body.sha=sha;
@@ -1006,6 +1009,7 @@ async function pushToGitHub(silent=false){
       headers:{'Authorization':`Bearer ${ghToken}`,'Accept':'application/vnd.github+json','Content-Type':'application/json'},
       body:JSON.stringify(body)
     });
+    pushToGitHub._running=false;
     if(putResp.ok){
       if(!silent) statusEl.innerHTML='<span style="color:#27500A">✓ Pushed! Team will see changes on next refresh.</span>';
       return true;
@@ -1015,6 +1019,7 @@ async function pushToGitHub(silent=false){
       return false;
     }
   }catch(e){
+    pushToGitHub._running=false;
     if(!silent) statusEl.innerHTML=`<span style="color:#A32D2D">✗ Error: ${e.message}</span>`;
     return false;
   }
@@ -1081,10 +1086,13 @@ function save(){
     localStorage.setItem(HK,JSON.stringify(noHoliday));
     setSS('saved');
   }catch(e){setSS('error');}
-  // Push to GitHub in background if configured
+  // Push to GitHub — debounced so rapid changes batch into one push
   if(ghUser&&ghRepo&&ghToken){
-    setSS('saving');
-    pushToGitHub(true).then(ok=>setSS(ok?'saved':'saved')); // don't show error on auto-push
+    clearTimeout(save._ghTimer);
+    save._ghTimer=setTimeout(()=>{
+      setSS('saving');
+      pushToGitHub(true).then(ok=>setSS(ok?'saved':'saved'));
+    },2000); // wait 2s after last change before pushing
   }
 }
 function load(){
