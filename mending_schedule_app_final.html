@@ -1160,10 +1160,20 @@ function save(){
   // Push to GitHub — debounced so rapid changes batch into one push
   if(ghUser&&ghRepo&&ghToken){
     clearTimeout(save._ghTimer);
-    save._ghTimer=setTimeout(()=>{
+    save._ghTimer=setTimeout(async()=>{
       setSS('saving');
-      pushToGitHub(true).then(ok=>setSS(ok?'saved':'saved'));
-    },2000); // wait 2s after last change before pushing
+      const ok=await pushToGitHub(true);
+      if(ok){
+        setSS('saved');
+      } else {
+        // Retry once after 3s in case of transient SHA collision
+        setSS('saving');
+        setTimeout(async()=>{
+          const ok2=await pushToGitHub(false); // non-silent so error shows
+          setSS(ok2?'saved':'error');
+        },3000);
+      }
+    },2000);
   }
 }
 function load(){
@@ -1196,7 +1206,7 @@ function load(){
 }
 function setSS(st){
   const dot=document.getElementById('save-dot'),txt=document.getElementById('save-text');
-  const m={loading:['#BA7517','Loading...'],saving:['#BA7517','Saving...'],saved:['#639922','All changes saved'],error:['#A32D2D','Save failed']};
+  const m={loading:['#BA7517','Loading...'],saving:['#BA7517','Saving...'],saved:['#639922','All changes saved'],error:['#A32D2D','GitHub push failed — check ☁ sync settings']};
   const[c,l]=m[st]||m.saved;if(dot)dot.style.background=c;if(txt)txt.textContent=l;
 }
 
