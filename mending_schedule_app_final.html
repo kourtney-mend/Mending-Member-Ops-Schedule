@@ -148,6 +148,7 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
 </head>
 <body>
 <div id="tl-hover-card"></div>
+<div id="debug-overlay" style="display:none;position:fixed;bottom:10px;left:10px;right:10px;background:#1a1a1a;color:#00ff00;font-family:monospace;font-size:11px;padding:10px;border-radius:8px;z-index:9999;max-height:200px;overflow-y:auto;cursor:pointer" onclick="this.style.display='none'">Click to close</div>
 <div class="container">
   <div class="app-header">
     <div><div class="app-title">Member Ops Schedule</div><div class="app-meta">Mending · Ebony (EST) · Marisa & Ky (CST) · Manager view in PST</div></div>
@@ -3102,6 +3103,21 @@ function schedConfirmApply(){
       schedOverrides[agent][dateStr]=blocks;
     }
     save();
+    // Debug: show what was saved
+    const savedBlocks=schedOverrides[agent]&&schedOverrides[agent][dateStr]
+      ?schedOverrides[agent][dateStr]
+      :null;
+    const debugMsg=`SAVED ${agent} ${day} ${dateStr}: `+
+      (savedBlocks?savedBlocks.map(b=>`${b[0]} ${b[1]}-${b[2]}`).join(' | '):'NO OVERRIDE FOUND');
+    console.warn('🔵 DEBUG:', debugMsg);
+    const debugEl=document.getElementById('debug-overlay');
+    if(debugEl){
+      debugEl.innerHTML=debugMsg+'<br><small>tap to dismiss</small>';
+      debugEl.style.display='block';
+      debugEl.style.zIndex='99999';
+    } else {
+      alert('DEBUG: '+debugMsg);
+    }
   }catch(e){console.error('schedConfirmApply save error:',e);}
   try{notifyAgentScheduleChange(agent,dateStr,blocks);}catch(e){console.error('notify error:',e);}
   renderAll();
