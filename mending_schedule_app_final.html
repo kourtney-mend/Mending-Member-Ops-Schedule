@@ -3086,20 +3086,24 @@ function schedConfirmApply(){
   if(_pendingSchedSave._onConfirm){
     const cb=_pendingSchedSave._onConfirm;
     _pendingSchedSave=null;
-    cb();
+    try{cb();}catch(e){console.error('schedConfirm _onConfirm error:',e);}
+    renderAll();
     return;
   }
   const{agent,day,fw,blocks,dateStr}=_pendingSchedSave;
   _pendingSchedSave=null;
-  if(day==='Friday'){
-    if(!friOverrides[fw][agent]) friOverrides[fw][agent]={};
-    friOverrides[fw][agent][dateStr]=blocks;
-  } else {
-    if(!schedOverrides[agent]) schedOverrides[agent]={};
-    schedOverrides[agent][dateStr]=blocks;
-  }
-  save();
-  notifyAgentScheduleChange(agent,dateStr,blocks);
+  try{
+    if(day==='Friday'){
+      if(!friOverrides[fw]) friOverrides[fw]={};
+      if(!friOverrides[fw][agent]) friOverrides[fw][agent]={};
+      friOverrides[fw][agent][dateStr]=blocks;
+    } else {
+      if(!schedOverrides[agent]) schedOverrides[agent]={};
+      schedOverrides[agent][dateStr]=blocks;
+    }
+    save();
+  }catch(e){console.error('schedConfirmApply save error:',e);}
+  try{notifyAgentScheduleChange(agent,dateStr,blocks);}catch(e){console.error('notify error:',e);}
   renderAll();
 }
 
@@ -4118,9 +4122,10 @@ function renderTransfersOnly(){
 }
 
 function renderAll(){
-  renderManager();renderAgent();
-  if(document.getElementById('view-coverage').classList.contains('active'))renderCovTab();
-  if(document.getElementById('view-transfers').classList.contains('active'))renderTransfersOnly();
+  try{renderManager();}catch(e){console.error('renderManager error:',e);}
+  try{renderAgent();}catch(e){console.error('renderAgent error:',e);}
+  if(document.getElementById('view-coverage').classList.contains('active')){try{renderCovTab();}catch(e){}}
+  if(document.getElementById('view-transfers').classList.contains('active')){try{renderTransfersOnly();}catch(e){}}
   updateReqBadge();
 }
 
