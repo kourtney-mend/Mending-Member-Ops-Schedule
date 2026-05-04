@@ -1215,7 +1215,7 @@ function setSS(st){
 }
 
 // ── OOO helpers ──────────────────────────────────────────────
-const OOO_KEEP=['Break 1','Break 2','Lunch','Ticket Time','All Hands'];
+const OOO_KEEP=['Break 1','Break 2','Lunch','Ticket Time','All Hands','Huddle'];
 
 // Generate simplified schedule for an agent covering for OOO colleague(s)
 // Keeps their break/lunch/ticket blocks, replaces everything else with On Phones
@@ -1510,7 +1510,12 @@ function gBlocks(agent,day,fw,tS,tF){
     return partial;
   }
   const someoneOOO=AGENTS.filter(a=>a!==agent&&ooo[a]&&ooo[a][dateStr]===true).length>0;
-  if(someoneOOO) return applyOOOCoverage(blocks);
+  // Only apply simplified coverage if there's no manual override for this agent on this date
+  // Manual overrides mean the manager has already customised this agent's schedule
+  const hasManualOverride=day==='Friday'
+    ?!!(friOverrides[fw]&&friOverrides[fw][agent]&&friOverrides[fw][agent][dateStr])
+    :!!(schedOverrides[agent]&&schedOverrides[agent][dateStr]);
+  if(someoneOOO&&!hasManualOverride) return applyOOOCoverage(blocks);
   return blocks;
 }
 // Merge proposed blocks into an existing schedule.
