@@ -1714,7 +1714,13 @@ function renderDualTL(agent,day,fw,container){
   const rawBlocks=getRawBlocks(agent,day,fw);
   // Debug — log what we're rendering
   if(agent==='Ebony'){
-    console.warn(`🟡 renderDualTL ${agent} ${day} fw=${fw}: raw=${rawBlocks.map(b=>b[0]+' '+b[1]+'-'+b[2]).join('|')}`);
+    const ds=toISO(dateOfDay(day,weekOffset));
+    const hasOverride=day==='Friday'
+      ?!!(friOverrides[fw]&&friOverrides[fw][agent]&&friOverrides[fw][agent][ds])
+      :!!(schedOverrides[agent]&&schedOverrides[agent][ds]);
+    console.warn(`🟡 renderDualTL ${agent} ${day} fw=${fw} wo=${weekOffset} dateStr=${ds} hasOverride=${hasOverride} blocks=${rawBlocks.length}`);
+    if(day==='Friday') console.warn('🟡 friOverrides['+fw+'][Ebony] keys:',
+      friOverrides[fw]&&friOverrides[fw][agent]?Object.keys(friOverrides[fw][agent]):'NONE');
   }
   if(!displayBlocks.length){container.innerHTML='<p style="font-size:12px;color:var(--text-tertiary)">No blocks</p>';return;}
   // Use displayBlocks for the visible bar so toggles (holiday, noOB, noPT) are reflected
