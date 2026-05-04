@@ -148,7 +148,6 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
 </head>
 <body>
 <div id="tl-hover-card"></div>
-<div id="debug-overlay" style="display:none;position:fixed;bottom:10px;left:10px;right:10px;background:#1a1a1a;color:#00ff00;font-family:monospace;font-size:11px;padding:10px;border-radius:8px;z-index:9999;max-height:200px;overflow-y:auto;cursor:pointer" onclick="this.style.display='none'">Click to close</div>
 <div class="container">
   <div class="app-header">
     <div><div class="app-title">Member Ops Schedule</div><div class="app-meta">Mending · Ebony (EST) · Marisa & Ky (CST) · Manager view in PST</div></div>
@@ -1067,8 +1066,11 @@ async function pushToGitHub(silent=false){
   }
 }
 
+let _ghPullBlocked=false; // block pulls while a save is in progress
+
 async function pullFromGitHub(){
   if(!ghUser||!ghRepo) return false;
+  if(_ghPullBlocked) return false; // don't overwrite local changes mid-save
   try{
     // Try GitHub Pages URL first (works for both public and private via Pages)
     // Then fall back to raw.githubusercontent.com
@@ -1160,17 +1162,18 @@ function save(){
   }catch(e){setSS('error');}
   // Push to GitHub — debounced so rapid changes batch into one push
   if(ghUser&&ghRepo&&ghToken){
+    _ghPullBlocked=true; // prevent pulls from overwriting local changes
     clearTimeout(save._ghTimer);
     save._ghTimer=setTimeout(async()=>{
       setSS('saving');
       const ok=await pushToGitHub(true);
+      _ghPullBlocked=false; // allow pulls again after push completes
       if(ok){
         setSS('saved');
       } else {
-        // Retry once after 3s in case of transient SHA collision
         setSS('saving');
         setTimeout(async()=>{
-          const ok2=await pushToGitHub(false); // non-silent so error shows
+          const ok2=await pushToGitHub(false);
           setSS(ok2?'saved':'error');
         },3000);
       }
@@ -1712,16 +1715,6 @@ function renderDualTL(agent,day,fw,container){
   const tz=ATZ[agent];
   const displayBlocks=gBlocks(agent,day,fw);
   const rawBlocks=getRawBlocks(agent,day,fw);
-  // Debug — log what we're rendering
-  if(agent==='Ebony'){
-    const ds=toISO(dateOfDay(day,weekOffset));
-    const hasOverride=day==='Friday'
-      ?!!(friOverrides[fw]&&friOverrides[fw][agent]&&friOverrides[fw][agent][ds])
-      :!!(schedOverrides[agent]&&schedOverrides[agent][ds]);
-    console.warn(`🟡 renderDualTL ${agent} ${day} fw=${fw} wo=${weekOffset} dateStr=${ds} hasOverride=${hasOverride} blocks=${rawBlocks.length}`);
-    if(day==='Friday') console.warn('🟡 friOverrides['+fw+'][Ebony] keys:',
-      friOverrides[fw]&&friOverrides[fw][agent]?Object.keys(friOverrides[fw][agent]):'NONE');
-  }
   if(!displayBlocks.length){container.innerHTML='<p style="font-size:12px;color:var(--text-tertiary)">No blocks</p>';return;}
   // Use displayBlocks for the visible bar so toggles (holiday, noOB, noPT) are reflected
   // rawBlocks are passed to buildDragBar only so drag indices stay anchored to saved data
@@ -3121,21 +3114,7 @@ function schedConfirmApply(){
       schedOverrides[agent][dateStr]=blocks;
     }
     save();
-    // Debug: show what was saved
-    const savedBlocks=schedOverrides[agent]&&schedOverrides[agent][dateStr]
-      ?schedOverrides[agent][dateStr]
-      :null;
-    const debugMsg=`SAVED ${agent} ${day} ${dateStr}: `+
-      (savedBlocks?savedBlocks.map(b=>`${b[0]} ${b[1]}-${b[2]}`).join(' | '):'NO OVERRIDE FOUND');
-    console.warn('🔵 DEBUG:', debugMsg);
-    const debugEl=document.getElementById('debug-overlay');
-    if(debugEl){
-      debugEl.innerHTML=debugMsg+'<br><small>tap to dismiss</small>';
-      debugEl.style.display='block';
-      debugEl.style.zIndex='99999';
-    } else {
-      alert('DEBUG: '+debugMsg);
-    }
+
   }catch(e){console.error('schedConfirmApply save error:',e);}
   try{notifyAgentScheduleChange(agent,dateStr,blocks);}catch(e){console.error('notify error:',e);}
   renderAll();
@@ -3159,10 +3138,6 @@ function saveBlocksForDate(agent,day,fw,blocks){
     schedOverrides[agent][dateStr]=clean;
   }
   // Debug panel — remove once confirmed working
-  const debugMsg=`SAVED ${agent} ${day} ${dateStr}: `+clean.map(b=>`${b[0]} ${b[1]}-${b[2]}`).join(' | ');
-  console.warn('🔵 DEBUG:', debugMsg);
-  const debugEl=document.getElementById('debug-overlay');
-  if(debugEl){debugEl.innerHTML=debugMsg+'<br><small>tap to dismiss</small>';debugEl.style.display='block';}
   // Snap manager view to the edited day so changes are visible immediately
   mDay=day;
   if(day==='Friday') mFW=fw;
@@ -4377,7 +4352,13 @@ function isToday(day,wo){
   });
 })();
 setSS('loading');populateSelects();buildLegend();loadGitHubSettings();load();loadRequests();loadSlackSettings();
-setInterval(()=>{renderManager();renderAgent();},60000);
+setInterval(()=>{
+  renderManager();renderAgent();
+  // Pull latest from GitHub every 60s (only if not mid-save and no token = viewer)
+  if(ghUser&&ghRepo&&!ghToken&&!_ghPullBlocked){
+    pullFromGitHub().then(ok=>{if(ok) renderAll();});
+  }
+},60000);
 </script>
 
 </body>
