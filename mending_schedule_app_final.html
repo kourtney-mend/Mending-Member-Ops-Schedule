@@ -3129,7 +3129,24 @@ function schedConfirmCancel(){
 }
 
 function saveBlocksForDate(agent,day,fw,blocks){
-  schedConfirmSave(agent,day,fw,blocks);
+  // Temporarily bypass confirmation modal — save directly to isolate render bug
+  const dateStr=toISO(dateOfDay(day,weekOffset));
+  const clean=blocks.filter(b=>t2m(b[2])>t2m(b[1])).sort((a,b)=>t2m(a[1])-t2m(b[1]));
+  if(day==='Friday'){
+    if(!friOverrides[fw]) friOverrides[fw]={};
+    if(!friOverrides[fw][agent]) friOverrides[fw][agent]={};
+    friOverrides[fw][agent][dateStr]=clean;
+  } else {
+    if(!schedOverrides[agent]) schedOverrides[agent]={};
+    schedOverrides[agent][dateStr]=clean;
+  }
+  const debugMsg=`SAVED ${agent} ${day} ${dateStr}: `+clean.map(b=>`${b[0]} ${b[1]}-${b[2]}`).join(' | ');
+  console.warn('🔵 DEBUG saveBlocksForDate:', debugMsg);
+  const debugEl=document.getElementById('debug-overlay');
+  if(debugEl){debugEl.innerHTML=debugMsg+'<br><small>tap to dismiss</small>';debugEl.style.display='block';}
+  save();
+  notifyAgentScheduleChange(agent,dateStr,clean);
+  renderAll();
 }
 
 function closeBam(){
