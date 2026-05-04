@@ -1970,7 +1970,11 @@ function forceApply(){
 
 function renderManager(){
   const mDateStr=toISO(dateOfDay(mDay,weekOffset));
-  if(mDay==='Friday') mFW=getFriWeekForDate(dateOfDay('Friday',weekOffset));
+  // Only auto-set mFW if Friday and it hasn't been locked by a save or AH button click
+  if(mDay==='Friday'&&!renderManager._mFWLocked){
+    mFW=getFriWeekForDate(dateOfDay('Friday',weekOffset));
+  }
+  renderManager._mFWLocked=false; // reset lock after one render
   buildDayBtns('mgr-days',mDay,mFW,'setMDay','setMgrFriWeek','navWeek');
   renderCovBar(mDay,mFW,'mgr-cov','mgr-alert');
   const wrap=document.getElementById('mgr-timelines');wrap.innerHTML='';
@@ -2037,7 +2041,7 @@ function renderManager(){
     <div class="sum-card"><div class="sum-lbl">Agents working</div><div class="sum-val">${AGENTS.filter(a=>!(ooo[a]&&ooo[a][mDateStr]===true)).length}</div><div class="sum-sub">of ${AGENTS.length} on ${dateDisp}</div></div>`;
 }
 function setMDay(d){mDay=d;renderManager();}
-function setMgrFriWeek(w){mFW=w;renderManager();}
+function setMgrFriWeek(w){mFW=w;renderManager._mFWLocked=true;renderManager();}
 function navWeek(dir){weekOffset+=dir;renderAll();}
 
 function renderAgent(){
@@ -3157,7 +3161,10 @@ function saveBlocksForDate(agent,day,fw,blocks){
   if(debugEl){debugEl.innerHTML=debugMsg+'<br><small>tap to dismiss</small>';debugEl.style.display='block';}
   // Snap manager view to the edited day so changes are visible immediately
   mDay=day;
-  if(day==='Friday') mFW=fw;
+  if(day==='Friday'){
+    mFW=fw;
+    renderManager._mFWLocked=true; // prevent renderManager from recalculating mFW
+  }
   if(bam.wo!==undefined) weekOffset=bam.wo;
   save();
   notifyAgentScheduleChange(agent,dateStr,clean);
