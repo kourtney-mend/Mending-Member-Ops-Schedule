@@ -1454,8 +1454,8 @@ function closeOooModal(){
   _oooContext={agent:null,dateStr:null,day:null,fw:null};
 }
 
-function getRawBlocks(agent,day,fw){
-  const dateStr=toISO(dateOfDay(day,weekOffset));
+function getRawBlocks(agent,day,fw,explicitDateStr){
+  const dateStr=explicitDateStr||toISO(dateOfDay(day,weekOffset));
   if(day==='Friday'){
     if(friOverrides[fw]&&friOverrides[fw][agent]&&friOverrides[fw][agent][dateStr])
       return JSON.parse(JSON.stringify(friOverrides[fw][agent][dateStr]));
@@ -1710,8 +1710,12 @@ function buildPSTBar(blocks,agent,tz){
 
 function renderDualTL(agent,day,fw,container){
   const tz=ATZ[agent];
-  const displayBlocks=gBlocks(agent,day,fw); // transformed (holiday/OOO/noOB/noPT) — for visual
-  const rawBlocks=getRawBlocks(agent,day,fw); // raw saved — for drag index mapping
+  const displayBlocks=gBlocks(agent,day,fw);
+  const rawBlocks=getRawBlocks(agent,day,fw);
+  // Debug — log what we're rendering
+  if(agent==='Ebony'){
+    console.warn(`🟡 renderDualTL ${agent} ${day} fw=${fw}: raw=${rawBlocks.map(b=>b[0]+' '+b[1]+'-'+b[2]).join('|')}`);
+  }
   if(!displayBlocks.length){container.innerHTML='<p style="font-size:12px;color:var(--text-tertiary)">No blocks</p>';return;}
   // Use displayBlocks for the visible bar so toggles (holiday, noOB, noPT) are reflected
   // rawBlocks are passed to buildDragBar only so drag indices stay anchored to saved data
@@ -2598,7 +2602,7 @@ let bam={}; // current block being acted on: {agent,day,fw,idx,block}
 function openAddBlock(e,agent,day,fw){
   if(!managerUnlocked){requirePIN('manager',()=>openAddBlock(e,agent,day,fw));return;}
   e.stopPropagation();
-  bam={agent,day,fw,idx:-1,block:null};
+  bam={agent,day,fw,idx:-1,block:null,wo:weekOffset,dateStr:toISO(dateOfDay(day,weekOffset))};
   const tz=ATZ[agent];
   const dateStr=toISO(dateOfDay(day,weekOffset));
   const dateDisp=new Date(dateStr+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
@@ -2707,7 +2711,7 @@ function bamSaveAdd(){
   if(!ns||!ne){alert('Please enter start and end times.');return;}
   if(t2m(ne)<=t2m(ns)){alert('End time must be after start time.');return;}
   const{agent,day,fw}=bam;
-  const blocks=JSON.parse(JSON.stringify(getRawBlocks(agent,day,fw)));
+  const blocks=JSON.parse(JSON.stringify(getRawBlocks(agent,day,fw,bam.dateStr)));
 
   if(act==='Huddle'){
     // Check if huddle overlaps any non-On Phones block
@@ -2834,7 +2838,7 @@ function openBlockAction(e,agent,day,fw,idx){
   if(idx>=blocks.length) return;
   const b=blocks[idx];
   const tz=ATZ[agent];
-  bam={agent,day,fw,idx,block:b};
+  bam={agent,day,fw,idx,block:b,wo:weekOffset,dateStr:toISO(dateOfDay(day,weekOffset))};
 
   // Populate modal
   document.getElementById('bam-title').textContent=`${agent} · ${b[0]}`;
@@ -2943,7 +2947,7 @@ function bamSaveEdit(){
   if(!ns||!ne){alert('Please enter start and end times.');return;}
   if(t2m(ne)<=t2m(ns)){alert('End time must be after start time.');return;}
   const{agent,day,fw,idx}=bam;
-  const blocks=JSON.parse(JSON.stringify(getRawBlocks(agent,day,fw)));
+  const blocks=JSON.parse(JSON.stringify(getRawBlocks(agent,day,fw,bam.dateStr)));
   blocks[idx]=[act,ns,ne];
   blocks.sort((a,b)=>t2m(a[1])-t2m(b[1]));
   closeBam();
@@ -2954,7 +2958,7 @@ function bamConfirmDelete(){
   const sel=document.querySelector('input[name="bam-replace"]:checked');
   const choice=sel?parseInt(sel.value):0;
   const{agent,day,fw,idx,block}=bam;
-  let blocks=JSON.parse(JSON.stringify(getRawBlocks(agent,day,fw)));
+  let blocks=JSON.parse(JSON.stringify(getRawBlocks(agent,day,fw,bam.dateStr)));
   const s=t2m(block[1]),e=t2m(block[2]);
 
   if(choice===0){
@@ -3129,8 +3133,8 @@ function schedConfirmCancel(){
 }
 
 function saveBlocksForDate(agent,day,fw,blocks){
-  // Temporarily bypass confirmation modal — save directly to isolate render bug
-  const dateStr=toISO(dateOfDay(day,weekOffset));
+  // Use the exact date captured when the modal opened — immune to weekOffset changes
+  const dateStr=bam.dateStr||toISO(dateOfDay(day,bam.wo!==undefined?bam.wo:weekOffset));
   const clean=blocks.filter(b=>t2m(b[2])>t2m(b[1])).sort((a,b)=>t2m(a[1])-t2m(b[1]));
   if(day==='Friday'){
     if(!friOverrides[fw]) friOverrides[fw]={};
@@ -3140,10 +3144,15 @@ function saveBlocksForDate(agent,day,fw,blocks){
     if(!schedOverrides[agent]) schedOverrides[agent]={};
     schedOverrides[agent][dateStr]=clean;
   }
+  // Debug panel — remove once confirmed working
   const debugMsg=`SAVED ${agent} ${day} ${dateStr}: `+clean.map(b=>`${b[0]} ${b[1]}-${b[2]}`).join(' | ');
-  console.warn('🔵 DEBUG saveBlocksForDate:', debugMsg);
+  console.warn('🔵 DEBUG:', debugMsg);
   const debugEl=document.getElementById('debug-overlay');
   if(debugEl){debugEl.innerHTML=debugMsg+'<br><small>tap to dismiss</small>';debugEl.style.display='block';}
+  // Snap manager view to the edited day so changes are visible immediately
+  mDay=day;
+  if(day==='Friday') mFW=fw;
+  if(bam.wo!==undefined) weekOffset=bam.wo;
   save();
   notifyAgentScheduleChange(agent,dateStr,clean);
   renderAll();
