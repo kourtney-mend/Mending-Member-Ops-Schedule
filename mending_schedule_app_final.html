@@ -251,6 +251,7 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
             <option value="permanent">Permanent break/lunch change</option>
             <option value="time">Additional time request</option>
             <option value="earlyleave">Early leave + makeup time</option>
+            <option value="shadowto">Shadowing — mark Transfers Only window</option>
           </select>
         </div>
       </div>
@@ -343,6 +344,19 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
         <div class="alert-box a-info" style="margin-bottom:0">
           <span>Permanent changes are limited to <strong>Break 1, Break 2, and Lunch</strong> timing. Use the block builder above to propose the new times for these activities.</span>
         </div>
+      </div>
+
+      <!-- Shadowing - TO panel -->
+      <div id="req-shadowto-panel" style="display:none;margin-bottom:1rem">
+        <div style="background:#E0F9FD;border:0.5px solid #67E8F9;border-radius:var(--radius-md);padding:12px;margin-bottom:10px">
+          <div style="font-size:12px;font-weight:500;color:#083344;margin-bottom:4px">📋 Shadowing — Transfers Only window</div>
+          <div style="font-size:12px;color:#0C4A6E">If this window falls within an existing Shadowing block on your schedule, it will be <strong>automatically approved</strong> — no manager review needed.</div>
+        </div>
+        <div class="form-row">
+          <div><label>Start time</label><input type="time" id="shadowto-start" oninput="checkShadowtoOverlap()" style="width:100%;font-size:13px;padding:7px 9px;border:0.5px solid var(--border-mid);border-radius:var(--radius-md);background:var(--bg-primary);color:var(--text-primary);font-family:var(--font)"></div>
+          <div><label>End time</label><input type="time" id="shadowto-end" oninput="checkShadowtoOverlap()" style="width:100%;font-size:13px;padding:7px 9px;border:0.5px solid var(--border-mid);border-radius:var(--radius-md);background:var(--bg-primary);color:var(--text-primary);font-family:var(--font)"></div>
+        </div>
+        <div id="shadowto-status" style="font-size:12px;margin-top:6px"></div>
       </div>
 
       <!-- Early leave + makeup panel -->
@@ -622,7 +636,7 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
 
 <!-- Block action modal -->
 <div class="modal-overlay" id="block-action-modal">
-  <div class="modal" style="max-width:360px">
+  <div class="modal" style="max-width:440px">
     <div class="modal-title" id="bam-title">Edit block</div>
     <div id="bam-info" style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:1rem;font-size:13px"></div>
 
@@ -639,14 +653,61 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
     <!-- Edit panel -->
     <div id="bam-edit-panel">
       <div class="form-row">
-        <div><label>Start time</label><input type="time" id="bam-start"></div>
-        <div><label>End time</label><input type="time" id="bam-end"></div>
+        <div><label>Start time</label><input type="time" id="bam-start" oninput="bamUpdateCovPreview()"></div>
+        <div><label>End time</label><input type="time" id="bam-end" oninput="bamUpdateCovPreview()"></div>
       </div>
-      <div style="margin-bottom:12px"><label>Activity</label><select id="bam-act"></select></div>
+      <div style="margin-bottom:12px"><label>Activity</label><select id="bam-act" onchange="bamUpdateCovPreview()"></select></div>
+      <!-- Coverage preview -->
+      <div id="bam-cov-preview" style="margin-bottom:12px"></div>
       <div class="btn-row">
         <button class="bp" onclick="bamSaveEdit()">Save change</button>
-        <button class="bs" onclick="bamShowDelete()">Delete instead</button>
-        <button class="bs" onclick="bamResetDay()" style="color:#A32D2D;border-color:#E8A0A0">↩ Reset this day</button>
+        <button id="bam-move-all-btn" class="bs" onclick="bamShowMoveAll()" style="display:none">Move for all agents</button>
+        <button class="bs" onclick="bamShowMove()">Move to another day</button>
+        <button class="bs" onclick="bamShowDelete()">Delete</button>
+        <button class="bs" onclick="bamResetDay()" style="color:#A32D2D;border-color:#E8A0A0">↩ Reset day</button>
+        <button class="bs" onclick="closeBam()">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Move all agents panel -->
+    <div id="bam-move-all-panel" style="display:none">
+      <div style="background:#E6F1FB;border:0.5px solid #B5D4F4;border-radius:var(--radius-md);padding:10px 12px;margin-bottom:1rem;font-size:13px;color:#0C447C">
+        Moving <strong id="bam-move-all-act">Weekly Sync</strong> for <strong>all agents</strong> on this day to the new time.
+      </div>
+      <div class="form-row">
+        <div><label>New start time</label><input type="time" id="bam-all-start" oninput="bamUpdateAllPreview()"></div>
+        <div><label>New end time</label><input type="time" id="bam-all-end" oninput="bamUpdateAllPreview()"></div>
+      </div>
+      <div id="bam-all-cov" style="margin-bottom:12px"></div>
+      <div id="bam-all-agents" style="margin-bottom:12px;font-size:12px;color:var(--text-secondary)"></div>
+      <div class="btn-row">
+        <button class="bp" onclick="bamConfirmMoveAll()">Move for all agents</button>
+        <button class="bs" onclick="bamShowEdit()">Back</button>
+        <button class="bs" onclick="closeBam()">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Move panel -->
+    <div id="bam-move-panel" style="display:none">
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:.75rem">Move this block to a different day. It will be removed from the current day and added to the destination.</p>
+      <div class="form-row">
+        <div>
+          <label>Destination day</label>
+          <select id="bam-move-day" onchange="bamUpdateMovePreview()" style="width:100%;font-size:13px;padding:7px 9px;border:0.5px solid var(--border-mid);border-radius:var(--radius-md);background:var(--bg-primary);color:var(--text-primary);font-family:var(--font)">
+            <option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option>
+          </select>
+        </div>
+        <div>
+          <label>At time</label>
+          <input type="time" id="bam-move-time" oninput="bamUpdateMovePreview()" style="width:100%;font-size:13px;padding:7px 9px;border:0.5px solid var(--border-mid);border-radius:var(--radius-md);background:var(--bg-primary);color:var(--text-primary);font-family:var(--font)">
+        </div>
+      </div>
+      <div id="bam-move-preview" style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;padding:8px 10px;background:var(--bg-secondary);border-radius:var(--radius-md);display:none"></div>
+      <!-- Coverage preview for destination day -->
+      <div id="bam-move-cov" style="margin-bottom:12px"></div>
+      <div class="btn-row">
+        <button class="bp" onclick="bamConfirmMove()">Move block</button>
+        <button class="bs" onclick="bamShowEdit()">Back</button>
         <button class="bs" onclick="closeBam()">Cancel</button>
       </div>
     </div>
@@ -665,13 +726,15 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
     <!-- Add panel -->
     <div id="bam-add-panel" style="display:none">
       <div class="form-row">
-        <div><label>Start time</label><input type="time" id="bam-add-start"></div>
-        <div><label>End time</label><input type="time" id="bam-add-end"></div>
+        <div><label>Start time</label><input type="time" id="bam-add-start" oninput="bamUpdateCovPreview()"></div>
+        <div><label>End time</label><input type="time" id="bam-add-end" oninput="bamUpdateCovPreview()"></div>
       </div>
-      <div style="margin-bottom:12px"><label>Activity</label><select id="bam-add-act"></select></div>
+      <div style="margin-bottom:12px"><label>Activity</label><select id="bam-add-act" onchange="bamUpdateCovPreview()"></select></div>
+      <!-- Coverage preview -->
+      <div id="bam-add-cov-preview" style="margin-bottom:12px"></div>
       <div class="btn-row">
         <button class="bp" onclick="bamSaveAdd()">Add block</button>
-        <button class="bs" onclick="bamResetDay()" style="color:#A32D2D;border-color:#E8A0A0">↩ Reset this day</button>
+        <button class="bs" onclick="bamResetDay()" style="color:#A32D2D;border-color:#E8A0A0">↩ Reset day</button>
         <button class="bs" onclick="closeBam()">Cancel</button>
       </div>
     </div>
@@ -863,7 +926,7 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
 </div>
 
 <script>
-const COLORS={'On Phones':{bg:'#B5D4F4',text:'#0C447C'},'Outbound':{bg:'#9FE1CB',text:'#085041'},'Ticket Time':{bg:'#CECBF6',text:'#3C3489'},'Break 1':{bg:'#D3D1C7',text:'#444441'},'Break 2':{bg:'#D3D1C7',text:'#444441'},'Lunch':{bg:'#FAC775',text:'#633806'},'Weekly Sync':{bg:'#F4C0D1',text:'#72243E'},'Project Time':{bg:'#C0DD97',text:'#27500A'},'1:1':{bg:'#F5C4B3',text:'#712B13'},'All Hands':{bg:'#EF9F27',text:'#412402'},'Huddle':{bg:'#D4B8F0',text:'#4A1A8C'},'Off':{bg:'#E8E7E3',text:'#888780'}};
+const COLORS={'On Phones':{bg:'#B5D4F4',text:'#0C447C'},'Outbound':{bg:'#9FE1CB',text:'#085041'},'Ticket Time':{bg:'#CECBF6',text:'#3C3489'},'Break 1':{bg:'#D3D1C7',text:'#444441'},'Break 2':{bg:'#D3D1C7',text:'#444441'},'Lunch':{bg:'#FAC775',text:'#633806'},'Weekly Sync':{bg:'#F4C0D1',text:'#72243E'},'Project Time':{bg:'#C0DD97',text:'#27500A'},'1:1':{bg:'#F5C4B3',text:'#712B13'},'All Hands':{bg:'#EF9F27',text:'#412402'},'Huddle':{bg:'#D4B8F0',text:'#4A1A8C'},'Training':{bg:'#FDE68A',text:'#78350F'},'Shadowing':{bg:'#A5F3FC',text:'#0C4A6E'},'Shadowing - TO':{bg:'#67E8F9',text:'#083344'},'Off':{bg:'#E8E7E3',text:'#888780'}};
 const ACTIVITIES=Object.keys(COLORS);
 const DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday'];
 const AGENTS=['Ebony','Marisa','Ky'];
@@ -1094,14 +1157,30 @@ async function pullFromGitHub(){
 
     if(!raw) return false;
 
-    // Apply pulled data
-    if(raw.schedOverrides) schedOverrides=raw.schedOverrides;
-    if(raw.friOverrides) friOverrides=raw.friOverrides;
-    if(raw.noOB) noOB=raw.noOB;
-    if(raw.noPT) noPT=raw.noPT;
-    if(raw.noHoliday) noHoliday=raw.noHoliday;
-    if(raw.ooo) ooo=raw.ooo;
-    // Cache to localStorage
+    // Deep merge pulled data into local state — local always wins (it's newer than the push)
+    // This prevents a pull from wiping changes made since the last push
+
+    function mergeDeep(local, remote){
+      // For each key in remote, only set it if local doesn't already have it
+      const result=JSON.parse(JSON.stringify(remote||{}));
+      Object.keys(local||{}).forEach(k=>{
+        if(local[k]!==null&&typeof local[k]==='object'&&!Array.isArray(local[k])){
+          result[k]=mergeDeep(local[k],result[k]||{});
+        } else if(local[k]!==undefined){
+          result[k]=local[k]; // local wins
+        }
+      });
+      return result;
+    }
+
+    if(raw.schedOverrides) schedOverrides=mergeDeep(schedOverrides,raw.schedOverrides);
+    if(raw.friOverrides) friOverrides=mergeDeep(friOverrides,raw.friOverrides);
+    if(raw.noOB) noOB=mergeDeep(noOB,raw.noOB);
+    if(raw.noPT) noPT=mergeDeep(noPT,raw.noPT);
+    if(raw.noHoliday) noHoliday=mergeDeep(noHoliday,raw.noHoliday);
+    if(raw.ooo) ooo=mergeDeep(ooo,raw.ooo);
+
+    // Cache merged result to localStorage
     localStorage.setItem(SOK,JSON.stringify(schedOverrides));
     localStorage.setItem(FOK,JSON.stringify(friOverrides));
     localStorage.setItem(OK,JSON.stringify(noOB));
@@ -1167,13 +1246,15 @@ function save(){
     save._ghTimer=setTimeout(async()=>{
       setSS('saving');
       const ok=await pushToGitHub(true);
-      _ghPullBlocked=false; // allow pulls again after push completes
       if(ok){
+        _ghPullBlocked=false; // safe to pull again
         setSS('saved');
       } else {
+        // Retry — keep blocked until retry completes
         setSS('saving');
         setTimeout(async()=>{
           const ok2=await pushToGitHub(false);
+          _ghPullBlocked=false; // unblock regardless of result
           setSS(ok2?'saved':'error');
         },3000);
       }
@@ -1215,7 +1296,7 @@ function setSS(st){
 }
 
 // ── OOO helpers ──────────────────────────────────────────────
-const OOO_KEEP=['Break 1','Break 2','Lunch','Ticket Time','All Hands','Huddle'];
+const OOO_KEEP=['Break 1','Break 2','Lunch','Ticket Time','All Hands','Huddle','Training'];
 
 // Generate simplified schedule for an agent covering for OOO colleague(s)
 // Keeps their break/lunch/ticket blocks, replaces everything else with On Phones
@@ -1608,7 +1689,7 @@ function getCov(day,fw,tS,tF){
     const aOff=getTZOffsetMins(ATZ[a]);
     const toEstMins=estOff-aOff;
     const bl=gBlocks(a,day,fw,tS,tF);
-    bl.forEach(b=>{if(b[0]!=='On Phones')return;const se=t2m(b[1])+toEstMins,ee=t2m(b[2])+toEstMins;for(let i=0;i<36;i++){const ss=COV_S+i*15,se2=ss+15;if(se<se2&&ee>ss)sl[i]++;}});
+    bl.forEach(b=>{if(b[0]!=='On Phones'&&b[0]!=='Shadowing')return;const se=t2m(b[1])+toEstMins,ee=t2m(b[2])+toEstMins;for(let i=0;i<36;i++){const ss=COV_S+i*15,se2=ss+15;if(se<se2&&ee>ss)sl[i]++;}});
   });
   const g=[];let gs=null;
   for(let i=0;i<36;i++){if(sl[i]===0){if(gs===null)gs=COV_S+i*15;}else{if(gs!==null){g.push({start:gs,end:COV_S+i*15});gs=null;}}}
@@ -1652,7 +1733,8 @@ function buildDayBtns(id,ad,afw,df,ff,navFn){
 const SHORT_LABELS={
   'On Phones':'📞','Outbound':'📤','Ticket Time':'🎫',
   'Break 1':'B1','Break 2':'B2','Lunch':'🍽',
-  'Weekly Sync':'Sync','Project Time':'Proj','1:1':'1:1','All Hands':'AH','Huddle':'Hudl'
+  'Weekly Sync':'Sync','Project Time':'Proj','1:1':'1:1','All Hands':'AH','Huddle':'Hudl',
+  'Training':'Train','Shadowing':'Shadow','Shadowing - TO':'Shdw-TO'
 };
 
 // ── Drag state ───────────────────────────────────────────────
@@ -2035,7 +2117,7 @@ function renderManager(){
     wrap.insertBefore(notice,wrap.firstChild);
   }
   let ph=0,ob=0,tot=0;
-  AGENTS.forEach(a=>{if(ooo[a]&&ooo[a][mDateStr]===true)return;gBlocks(a,mDay,mFW).forEach(b=>{const d=t2m(b[2])-t2m(b[1]);if(b[0]==='On Phones')ph+=d;if(b[0]==='Outbound')ob+=d;tot+=d;});});
+  AGENTS.forEach(a=>{if(ooo[a]&&ooo[a][mDateStr]===true)return;gBlocks(a,mDay,mFW).forEach(b=>{const d=t2m(b[2])-t2m(b[1]);if(b[0]==='On Phones'||b[0]==='Shadowing')ph+=d;if(b[0]==='Outbound')ob+=d;tot+=d;});});
   const dateDisp=new Date(mDateStr+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
   document.getElementById('mgr-summary').innerHTML=`
     <div class="sum-card"><div class="sum-lbl">Inbound coverage</div><div class="sum-val">${(ph/60).toFixed(1)}h</div><div class="sum-sub">across working agents</div></div>
@@ -2636,10 +2718,18 @@ function openAddBlock(e,agent,day,fw){
   document.getElementById('block-action-modal').classList.add('open');
 }
 
+function bamShowDelete(){
+  document.getElementById('bam-edit-panel').style.display='none';
+  document.getElementById('bam-delete-panel').style.display='block';
+  document.getElementById('bam-add-panel').style.display='none';
+  document.getElementById('bam-move-panel').style.display='none';
+}
 function bamShowAdd(){
   document.getElementById('bam-edit-panel').style.display='none';
   document.getElementById('bam-delete-panel').style.display='none';
   document.getElementById('bam-add-panel').style.display='block';
+  document.getElementById('bam-move-panel').style.display='none';
+  bamUpdateCovPreview();
 }
 
 function bamResetDay(){
@@ -2876,22 +2966,270 @@ function openBlockAction(e,agent,day,fw,idx){
   ).join('');
 
   bamShowEdit();
+  // Show "Move for all agents" button only for team-wide activities
+  const TEAM_ACTIVITIES=new Set(['Weekly Sync','All Hands','Huddle']);
+  const moveAllBtn=document.getElementById('bam-move-all-btn');
+  if(moveAllBtn) moveAllBtn.style.display=TEAM_ACTIVITIES.has(b[0])?'':'none';
   // Reset TZ toggle to agent TZ
   document.querySelector('input[name="bam-tz"][value="agent"]').checked=true;
   document.getElementById('bam-tz-agent-label').textContent=tz;
   document.getElementById('bam-tz-hint').textContent='';
   document.getElementById('block-action-modal').classList.add('open');
+  setTimeout(bamUpdateCovPreview, 50);
+}
+
+function bamShowMove(){
+  document.getElementById('bam-edit-panel').style.display='none';
+  document.getElementById('bam-delete-panel').style.display='none';
+  document.getElementById('bam-add-panel').style.display='none';
+  document.getElementById('bam-move-panel').style.display='block';
+  // Default destination = next day
+  const days=['Monday','Tuesday','Wednesday','Thursday','Friday'];
+  const curIdx=days.indexOf(bam.day);
+  const destDay=days[(curIdx+1)%5];
+  document.getElementById('bam-move-day').value=destDay;
+  // Default time = same as current block
+  document.getElementById('bam-move-time').value=bam.block?bam.block[1]:'09:00';
+  bamUpdateMovePreview();
+}
+
+function bamUpdateCovPreview(){
+  // Show mini coverage bar reflecting the edit/add change
+  const{agent,day,fw}=bam;
+  if(!agent||!day) return;
+  const isAdd=document.getElementById('bam-add-panel').style.display!=='none';
+  const previewId=isAdd?'bam-add-cov-preview':'bam-cov-preview';
+  const previewEl=document.getElementById(previewId);
+  if(!previewEl) return;
+
+  const ns=bamGetAgentTime(isAdd?'bam-add-start':'bam-start');
+  const ne=bamGetAgentTime(isAdd?'bam-add-end':'bam-end');
+  const act=document.getElementById(isAdd?'bam-add-act':'bam-act')?.value;
+  if(!ns||!ne||t2m(ne)<=t2m(ns)){previewEl.innerHTML='';return;}
+
+  // Build test blocks
+  const blocks=JSON.parse(JSON.stringify(getRawBlocks(agent,day,fw,bam.dateStr)));
+  let testBlocks;
+  if(isAdd){
+    testBlocks=[...blocks,[act,ns,ne]].sort((a,b)=>t2m(a[1])-t2m(b[1]));
+  } else {
+    testBlocks=JSON.parse(JSON.stringify(blocks));
+    if(bam.idx>=0&&bam.idx<testBlocks.length) testBlocks[bam.idx]=[act,ns,ne];
+    testBlocks.sort((a,b)=>t2m(a[1])-t2m(b[1]));
+  }
+
+  previewEl.innerHTML=bamCovHTML(day,fw,agent,testBlocks);
+}
+
+function bamUpdateMovePreview(){
+  const destDay=document.getElementById('bam-move-day').value;
+  const moveTime=document.getElementById('bam-move-time').value;
+  const previewEl=document.getElementById('bam-move-preview');
+  const covEl=document.getElementById('bam-move-cov');
+  if(!bam.block||!moveTime){previewEl.style.display='none';return;}
+
+  const dur=t2m(bam.block[2])-t2m(bam.block[1]);
+  const newStart=bamGetAgentTimeRaw(moveTime);
+  const newEnd=m2t(t2m(newStart)+dur);
+  const tz=ATZ[bam.agent];
+
+  previewEl.style.display='block';
+  previewEl.innerHTML=`Moving <strong>${bam.block[0]}</strong> to <strong>${destDay}</strong> at <strong>${m2d(t2m(newStart))}–${m2d(t2m(newEnd))} ${tz}</strong>`;
+
+  // Coverage preview for destination day
+  const destFW=destDay==='Friday'?getFriWeekForDate(dateOfDay(destDay,weekOffset)):1;
+  const destBlocks=JSON.parse(JSON.stringify(getRawBlocks(bam.agent,destDay,destFW)));
+  destBlocks.push([bam.block[0],newStart,newEnd]);
+  destBlocks.sort((a,b)=>t2m(a[1])-t2m(b[1]));
+  covEl.innerHTML=bamCovHTML(destDay,destFW,bam.agent,destBlocks);
+}
+
+function bamGetAgentTimeRaw(timeStr){
+  // Convert from selected TZ to agent TZ (same as bamGetAgentTime but takes a value directly)
+  if(!timeStr||!bam.agent) return timeStr;
+  const agentTZ=ATZ[bam.agent];
+  const sel=document.querySelector('input[name="bam-tz"]:checked')?.value||'agent';
+  if(sel==='agent') return timeStr;
+  return convertToAgentTZ(timeStr, sel, agentTZ);
+}
+
+function bamCovHTML(day,fw,editAgent,editBlocks){
+  // Build a mini coverage bar showing all-agent inbound coverage
+  // Uses edited blocks for editAgent, live blocks for others
+  const slots=new Array(36).fill(0);
+  const estOff=getTZOffsetMins('EST');
+  AGENTS.forEach(a=>{
+    const aOff=getTZOffsetMins(ATZ[a]);
+    const toEst=estOff-aOff;
+    const bl=a===editAgent?editBlocks:gBlocks(a,day,fw);
+    bl.forEach(b=>{
+      if(b[0]!=='On Phones') return;
+      const se=t2m(b[1])+toEst, ee=t2m(b[2])+toEst;
+      for(let i=0;i<36;i++){const ss=COV_S+i*15,se2=ss+15;if(se<se2&&ee>ss)slots[i]++;}
+    });
+  });
+  const gaps=[];let gs=null;
+  for(let i=0;i<36;i++){if(slots[i]===0){if(gs===null)gs=COV_S+i*15;}else{if(gs!==null){gaps.push({s:gs,e:COV_S+i*15});gs=null;}}}
+  if(gs!==null) gaps.push({s:gs,e:COV_E});
+
+  const barSegs=slots.map(c=>{
+    const bg=c===0?'#FCEBEB':c===1?'#EAF3DE':'#B5D4F4';
+    return`<div style="flex:1;background:${bg};height:100%"></div>`;
+  }).join('');
+
+  const gapText=gaps.length===0
+    ?`<span style="color:#27500A">✓ Full coverage</span>`
+    :`<span style="color:#A32D2D">⚠ Gap${gaps.length>1?'s':''}: ${gaps.map(g=>`${m2d(g.s)}–${m2d(g.e)}`).join(', ')} EST</span>`;
+
+  return`<div>
+    <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:3px">Coverage impact (9am–6pm EST)</div>
+    <div style="display:flex;height:8px;border-radius:4px;overflow:hidden;border:0.5px solid var(--border-light);margin-bottom:4px">${barSegs}</div>
+    <div style="font-size:11px">${gapText}</div>
+  </div>`;
+}
+
+function bamConfirmMove(){
+  const destDay=document.getElementById('bam-move-day').value;
+  const moveTime=document.getElementById('bam-move-time').value;
+  if(!moveTime){alert('Please enter a time.');return;}
+  const{agent,day,fw,idx,block}=bam;
+  const newStart=bamGetAgentTimeRaw(moveTime);
+  const dur=t2m(block[2])-t2m(block[1]);
+  const newEnd=m2t(t2m(newStart)+dur);
+
+  // Remove from source day — replace with On Phones
+  const srcBlocks=JSON.parse(JSON.stringify(getRawBlocks(agent,day,fw,bam.dateStr)));
+  srcBlocks[idx]=['On Phones',block[1],block[2]];
+  const cleanSrc=mergeOP(srcBlocks).filter(b=>t2m(b[2])>t2m(b[1]));
+
+  // Add to destination day
+  const destFW=destDay==='Friday'?getFriWeekForDate(dateOfDay(destDay,weekOffset)):1;
+  const destDateStr=toISO(dateOfDay(destDay,weekOffset));
+  const destBlocks=JSON.parse(JSON.stringify(getRawBlocks(agent,destDay,destFW,destDateStr)));
+  destBlocks.push([block[0],newStart,newEnd]);
+  destBlocks.sort((a,b)=>t2m(a[1])-t2m(b[1]));
+
+  // Save source day
+  const srcDateStr=bam.dateStr;
+  if(day==='Friday'){
+    if(!friOverrides[fw]) friOverrides[fw]={};
+    if(!friOverrides[fw][agent]) friOverrides[fw][agent]={};
+    friOverrides[fw][agent][srcDateStr]=cleanSrc;
+  } else {
+    if(!schedOverrides[agent]) schedOverrides[agent]={};
+    schedOverrides[agent][srcDateStr]=cleanSrc;
+  }
+
+  // Save destination day
+  if(destDay==='Friday'){
+    if(!friOverrides[destFW]) friOverrides[destFW]={};
+    if(!friOverrides[destFW][agent]) friOverrides[destFW][agent]={};
+    friOverrides[destFW][agent][destDateStr]=destBlocks;
+  } else {
+    if(!schedOverrides[agent]) schedOverrides[agent]={};
+    schedOverrides[agent][destDateStr]=destBlocks;
+  }
+
+  closeBam();
+  save();
+  renderAll();
+}
+function bamShowMoveAll(){
+  document.getElementById('bam-edit-panel').style.display='none';
+  document.getElementById('bam-delete-panel').style.display='none';
+  document.getElementById('bam-add-panel').style.display='none';
+  document.getElementById('bam-move-panel').style.display='none';
+  document.getElementById('bam-move-all-panel').style.display='block';
+  const{block,day}=bam;
+  document.getElementById('bam-move-all-act').textContent=block[0];
+  // Default to current times
+  document.getElementById('bam-all-start').value=block[1];
+  document.getElementById('bam-all-end').value=block[2];
+  bamUpdateAllPreview();
+}
+
+function bamUpdateAllPreview(){
+  const{agent,day,fw}=bam;
+  const ns=document.getElementById('bam-all-start').value;
+  const ne=document.getElementById('bam-all-end').value;
+  const act=bam.block?bam.block[0]:'Weekly Sync';
+  if(!ns||!ne||t2m(ne)<=t2m(ns)){
+    document.getElementById('bam-all-cov').innerHTML='';
+    document.getElementById('bam-all-agents').innerHTML='';
+    return;
+  }
+
+  // Show which agents have this activity and where it'll move
+  const agentLines=AGENTS.map(a=>{
+    const tz=ATZ[a];
+    const aBlocks=getRawBlocks(a,day,fw,bam.dateStr);
+    const existing=aBlocks.find(b=>b[0]===act);
+    const agentNS=convertToAgentTZ(ns,ATZ[agent],tz);
+    const agentNE=convertToAgentTZ(ne,ATZ[agent],tz);
+    const hasIt=!!existing;
+    return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--border-light)">
+      <div style="width:8px;height:8px;border-radius:50%;background:${hasIt?'#27500A':'#888'};flex-shrink:0"></div>
+      <span style="flex:1"><strong>${a}</strong> ${tz}</span>
+      <span style="color:var(--text-tertiary)">${hasIt?`${m2d(t2m(existing[1]))}–${m2d(t2m(existing[2]))} → `:'No ${act} · adding '}<strong style="color:var(--text-primary)">${m2d(t2m(agentNS))}–${m2d(t2m(agentNE))}</strong></span>
+    </div>`;
+  }).join('');
+  document.getElementById('bam-all-agents').innerHTML=agentLines;
+
+  // Coverage preview using edited agent's blocks as proxy
+  const testBlocks=JSON.parse(JSON.stringify(getRawBlocks(agent,day,fw,bam.dateStr)));
+  const idx=testBlocks.findIndex(b=>b[0]===act);
+  if(idx>=0) testBlocks[idx]=[act,ns,ne];
+  else testBlocks.push([act,ns,ne]);
+  testBlocks.sort((a,b)=>t2m(a[1])-t2m(b[1]));
+  document.getElementById('bam-all-cov').innerHTML=bamCovHTML(day,fw,agent,testBlocks);
+}
+
+function bamConfirmMoveAll(){
+  const{agent,day,fw}=bam;
+  const act=bam.block?bam.block[0]:'Weekly Sync';
+  const ns=document.getElementById('bam-all-start').value;
+  const ne=document.getElementById('bam-all-end').value;
+  if(!ns||!ne){alert('Please enter start and end times.');return;}
+  if(t2m(ne)<=t2m(ns)){alert('End time must be after start time.');return;}
+
+  // Apply to all agents — convert time from clicked agent's TZ to each agent's TZ
+  AGENTS.forEach(a=>{
+    const tz=ATZ[a];
+    const agentNS=convertToAgentTZ(ns,ATZ[agent],tz);
+    const agentNE=convertToAgentTZ(ne,ATZ[agent],tz);
+    const aBlocks=JSON.parse(JSON.stringify(getRawBlocks(a,day,fw,bam.dateStr)));
+    const idx=aBlocks.findIndex(b=>b[0]===act);
+    if(idx>=0){
+      aBlocks[idx]=[act,agentNS,agentNE];
+    } else {
+      // Agent doesn't have this block — add it
+      aBlocks.push([act,agentNS,agentNE]);
+    }
+    aBlocks.sort((x,y)=>t2m(x[1])-t2m(y[1]));
+    const dateStr=bam.dateStr||toISO(dateOfDay(day,weekOffset));
+    if(day==='Friday'){
+      if(!friOverrides[fw]) friOverrides[fw]={};
+      if(!friOverrides[fw][a]) friOverrides[fw][a]={};
+      friOverrides[fw][a][dateStr]=aBlocks;
+    } else {
+      if(!schedOverrides[a]) schedOverrides[a]={};
+      schedOverrides[a][dateStr]=aBlocks;
+    }
+    notifyAgentScheduleChange(a,dateStr,aBlocks);
+  });
+
+  closeBam();
+  save();
+  renderAll();
 }
 
 function bamShowEdit(){
   document.getElementById('bam-edit-panel').style.display='block';
   document.getElementById('bam-delete-panel').style.display='none';
   document.getElementById('bam-add-panel').style.display='none';
-}
-function bamShowDelete(){
-  document.getElementById('bam-edit-panel').style.display='none';
-  document.getElementById('bam-delete-panel').style.display='block';
-  document.getElementById('bam-add-panel').style.display='none';
+  document.getElementById('bam-move-panel').style.display='none';
+  document.getElementById('bam-move-all-panel').style.display='none';
+  bamUpdateCovPreview();
 }
 
 // ── BAM timezone toggle ──────────────────────────────────────
@@ -3056,8 +3394,8 @@ function insertHuddle(blocks, huddleStart, huddleEnd){
 // ── Schedule change confirmation ──────────────────────────────
 let _pendingSchedSave=null; // {agent, day, fw, blocks, dateStr}
 
-function schedConfirmSave(agent,day,fw,blocks){
-  const dateStr=toISO(dateOfDay(day,weekOffset));
+function schedConfirmSave(agent,day,fw,blocks,explicitDateStr){
+  const dateStr=explicitDateStr||toISO(dateOfDay(day,weekOffset));
   const clean=blocks.filter(b=>t2m(b[2])>t2m(b[1])).sort((a,b)=>t2m(a[1])-t2m(b[1]));
   const tz=ATZ[agent];
   const dateDisp=new Date(dateStr+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
@@ -3134,22 +3472,12 @@ function saveBlocksForDate(agent,day,fw,blocks){
   // Use the exact date captured when the modal opened — immune to weekOffset changes
   const dateStr=bam.dateStr||toISO(dateOfDay(day,bam.wo!==undefined?bam.wo:weekOffset));
   const clean=blocks.filter(b=>t2m(b[2])>t2m(b[1])).sort((a,b)=>t2m(a[1])-t2m(b[1]));
-  if(day==='Friday'){
-    if(!friOverrides[fw]) friOverrides[fw]={};
-    if(!friOverrides[fw][agent]) friOverrides[fw][agent]={};
-    friOverrides[fw][agent][dateStr]=clean;
-  } else {
-    if(!schedOverrides[agent]) schedOverrides[agent]={};
-    schedOverrides[agent][dateStr]=clean;
-  }
-  // Debug panel — remove once confirmed working
-  // Snap manager view to the edited day so changes are visible immediately
+  // Snap manager view to the edited day before showing confirmation
   mDay=day;
   if(day==='Friday') mFW=fw;
   if(bam.wo!==undefined) weekOffset=bam.wo;
-  save();
-  notifyAgentScheduleChange(agent,dateStr,clean);
-  renderAll();
+  // Show confirmation modal with preview before committing
+  schedConfirmSave(agent,day,fw,clean,dateStr);
 }
 
 function closeBam(){
@@ -3327,7 +3655,7 @@ async function sendSlackNotification(webhookUrl,req){
     // Pre-formatted message passed directly
     text=req._raw;
   } else {
-    const typeLabels={shift:'Shift time change',day:'Day change',permanent:'Permanent break/lunch',time:'Additional time',earlyleave:'Early leave + makeup'};
+    const typeLabels={shift:'Shift time change',day:'Day change',permanent:'Permanent break/lunch',time:'Additional time',earlyleave:'Early leave + makeup',shadowto:'Shadowing — TO window'};
     const typeLabel=typeLabels[req.type]||req.type;
     const dateDisp=req.date?new Date(req.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',year:'numeric'}):'';
     let detail='';
@@ -3403,8 +3731,9 @@ function onReqTypeChange(){
   const elPanel=document.getElementById('req-earlyleave-panel');
   const permNotice=document.getElementById('req-permanent-notice');
   const shiftPanel=document.getElementById('req-shift-panel');
+  const shadowtoPanel=document.getElementById('req-shadowto-panel');
 
-  const labels={shift:'Date of shift',day:'Date requested',permanent:'Starting from date',time:'Date requested',earlyleave:'Date leaving early'};
+  const labels={shift:'Date of shift',day:'Date requested',permanent:'Starting from date',time:'Date requested',earlyleave:'Date leaving early',shadowto:'Date of shadowing'};
   dateLabel.textContent=labels[type]||'Date requested';
   wrap.style.display=type==='permanent'?'block':'none';
   blocksPanel.style.display=(type==='day'||type==='permanent')?'block':'none';
@@ -3412,10 +3741,12 @@ function onReqTypeChange(){
   elPanel.style.display=type==='earlyleave'?'block':'none';
   permNotice.style.display=type==='permanent'?'block':'none';
   shiftPanel.style.display=type==='shift'?'block':'none';
+  if(shadowtoPanel) shadowtoPanel.style.display=type==='shadowto'?'block':'none';
 
   if(type==='time') updateReqTimeCurrent();
   if(type==='earlyleave') updateElTotal();
   if(type==='shift') updateShiftPreview();
+  if(type==='shadowto') checkShadowtoOverlap();
 }
 
 function updateReqTimeCurrent(){
@@ -3528,6 +3859,37 @@ function updateElTotal(){
   else el.innerHTML=`<span style="color:#27500A">✓ ${fmt(committed)} committed — matches ${fmt(requested)} required</span>`;
 }
 
+function checkShadowtoOverlap(){
+  const agent=document.getElementById('req-agent').value;
+  const date=document.getElementById('req-date').value;
+  const start=document.getElementById('shadowto-start').value;
+  const end=document.getElementById('shadowto-end').value;
+  const statusEl=document.getElementById('shadowto-status');
+  if(!statusEl) return;
+  if(!date||!start||!end||t2m(end)<=t2m(start)){statusEl.innerHTML='';return;}
+
+  const d=new Date(date+'T12:00:00');
+  const dayName=d.toLocaleDateString('en-US',{weekday:'long'});
+  if(!DAYS.includes(dayName)){statusEl.innerHTML='<span style="color:#A32D2D">Please select a weekday.</span>';return;}
+
+  // Find weekOffset for this date
+  const savedWO=weekOffset;
+  for(let wo=-52;wo<=52;wo++){if(toISO(dateOfDay(dayName,wo))===date){weekOffset=wo;break;}}
+  const fw=dayName==='Friday'?getFriWeekForDate(d):1;
+  const blocks=getRawBlocks(agent,dayName,fw);
+  weekOffset=savedWO;
+
+  const hs=t2m(start),he=t2m(end);
+  const shadowBlock=blocks.find(b=>b[0]==='Shadowing'&&t2m(b[1])<=hs&&t2m(b[2])>=he);
+
+  if(shadowBlock){
+    const tz=ATZ[agent];
+    statusEl.innerHTML=`<span style="color:#27500A">✓ Falls within Shadowing ${m2d(t2m(shadowBlock[1]))}–${m2d(t2m(shadowBlock[2]))} ${tz} — will be <strong>auto-approved</strong></span>`;
+  } else {
+    statusEl.innerHTML=`<span style="color:#BA7517">⚠ No Shadowing block found covering this window — will go to manager for review</span>`;
+  }
+}
+
 function submitRequest(){
   const agent=document.getElementById('req-agent').value;
   const type=document.getElementById('req-type').value;
@@ -3539,6 +3901,7 @@ function submitRequest(){
   let timeAct=null,timeMinutes=0,timeFreq='once';
   let elLeaveTime=null,elHours=0,elActivity=null,elMakeup=[];
   let shiftNewStart=null,shiftNewEnd=null;
+  let shadowtoStart=null,shadowtoEnd=null;
 
   if(type==='shift'){
     shiftNewStart=document.getElementById('shift-start').value;
@@ -3557,6 +3920,70 @@ function submitRequest(){
     if(!elLeaveTime){alert('Please enter the time you plan to leave.');return;}
     if(elMakeupDays.length===0){alert('Please add at least one makeup day.');return;}
     elMakeup=JSON.parse(JSON.stringify(elMakeupDays));
+  } else if(type==='shadowto'){
+    shadowtoStart=document.getElementById('shadowto-start').value;
+    shadowtoEnd=document.getElementById('shadowto-end').value;
+    if(!shadowtoStart||!shadowtoEnd){alert('Please enter a start and end time for the TO window.');return;}
+    if(t2m(shadowtoEnd)<=t2m(shadowtoStart)){alert('End time must be after start time.');return;}
+
+    // Check if it overlaps an existing Shadowing block — if so, auto-approve
+    const d=new Date(date+'T12:00:00');
+    const dayName=d.toLocaleDateString('en-US',{weekday:'long'});
+    const savedWO=weekOffset;
+    for(let wo=-52;wo<=52;wo++){if(toISO(dateOfDay(dayName,wo))===date){weekOffset=wo;break;}}
+    const fw=dayName==='Friday'?getFriWeekForDate(d):1;
+    const blocks=getRawBlocks(agent,dayName,fw);
+    weekOffset=savedWO;
+
+    const hs=t2m(shadowtoStart),he=t2m(shadowtoEnd);
+    const shadowBlock=blocks.find(b=>b[0]==='Shadowing'&&t2m(b[1])<=hs&&t2m(b[2])>=he);
+
+    if(shadowBlock){
+      // Auto-approve: insert Shadowing-TO block, splitting the Shadowing block around it
+      const savedWO2=weekOffset;
+      for(let wo=-52;wo<=52;wo++){if(toISO(dateOfDay(dayName,wo))===date){weekOffset=wo;break;}}
+      const fw2=dayName==='Friday'?getFriWeekForDate(d):1;
+      const allBlocks=JSON.parse(JSON.stringify(getRawBlocks(agent,dayName,fw2)));
+      weekOffset=savedWO2;
+
+      // Split the Shadowing block around the TO window
+      const newBlocks=[];
+      allBlocks.forEach(b=>{
+        if(b[0]==='Shadowing'&&t2m(b[1])<=hs&&t2m(b[2])>=he){
+          if(t2m(b[1])<hs) newBlocks.push(['Shadowing',b[1],m2t(hs)]);
+          newBlocks.push(['Shadowing - TO',m2t(hs),m2t(he)]);
+          if(t2m(b[2])>he) newBlocks.push(['Shadowing',m2t(he),b[2]]);
+        } else {
+          newBlocks.push(b);
+        }
+      });
+      newBlocks.sort((a,b)=>t2m(a[1])-t2m(b[1]));
+
+      if(dayName==='Friday'){
+        if(!friOverrides[fw2]) friOverrides[fw2]={};
+        if(!friOverrides[fw2][agent]) friOverrides[fw2][agent]={};
+        friOverrides[fw2][agent][date]=newBlocks;
+      } else {
+        if(!schedOverrides[agent]) schedOverrides[agent]={};
+        schedOverrides[agent][date]=newBlocks;
+      }
+      save();renderAll();
+
+      // Create auto-approved request record
+      const req={
+        id:'req-'+Date.now(),agent,type,date,dayOfWeek,blocks:[],notes,
+        status:'approved',submittedAt:new Date().toISOString(),
+        resolvedAt:new Date().toISOString(),managerNote:'Auto-approved — within scheduled Shadowing block',
+        shadowtoStart,shadowtoEnd,
+      };
+      requests.push(req);
+      saveRequests();updateReqBadge();reqClear();
+      const dateDisp=new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+      document.getElementById('req-status').innerHTML=`<span style="color:#27500A">✓ Auto-approved! Shadowing - TO added to your schedule for ${dateDisp}.</span>`;
+      renderMyRequests(agent);
+      return;
+    }
+    // Falls outside Shadowing — goes to manager review as normal
   } else {
     if(reqBlocks.length===0&&!notes){alert('Please add at least one proposed block or a note.');return;}
   }
@@ -3564,12 +3991,12 @@ function submitRequest(){
   const req={
     id:'req-'+Date.now(),
     agent,type,date,dayOfWeek,
-    blocks:type==='time'||type==='earlyleave'||type==='shift'?[]:JSON.parse(JSON.stringify(reqBlocks)),
+    blocks:type==='time'||type==='earlyleave'||type==='shift'||type==='shadowto'?[]:JSON.parse(JSON.stringify(reqBlocks)),
     notes,status:'pending',
     submittedAt:new Date().toISOString(),resolvedAt:null,managerNote:'',
     timeAct,timeMinutes,timeFreq,approvedMinutes:null,
     elLeaveTime,elHours,elActivity,elMakeup,elMakeupStatus:{},
-    shiftNewStart,shiftNewEnd,
+    shiftNewStart,shiftNewEnd,shadowtoStart,shadowtoEnd,
   };
   requests.push(req);
   saveRequests();updateReqBadge();reqClear();
@@ -3589,7 +4016,7 @@ function renderMyRequests(agent){
     const statusColor={pending:'#BA7517',approved:'#27500A',denied:'#A32D2D',countered:'#185FA5'}[r.status]||'#888';
     const statusBg={pending:'#FAEEDA',approved:'#EAF3DE',denied:'#FCEBEB',countered:'#E6F1FB'}[r.status]||'#eee';
     const dateDisp=new Date(r.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
-    const typeLabel={shift:'Shift time change',day:'Day change',permanent:'Permanent break/lunch',time:'Additional time',earlyleave:'Early leave + makeup'}[r.type]||r.type;
+    const typeLabel={shift:'Shift time change',day:'Day change',permanent:'Permanent break/lunch',time:'Additional time',earlyleave:'Early leave + makeup',shadowto:'Shadowing — TO window'}[r.type]||r.type;
     let detail='';
     if(r.type==='shift'&&r.shiftNewStart){
       const tz=ATZ[r.agent];
@@ -3646,7 +4073,7 @@ function renderReviewList(){
     const statusColor={pending:'#BA7517',approved:'#27500A',denied:'#A32D2D',countered:'#185FA5'}[r.status]||'#888';
     const statusBg={pending:'#FAEEDA',approved:'#EAF3DE',denied:'#FCEBEB',countered:'#E6F1FB'}[r.status]||'#eee';
     const dateDisp=new Date(r.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',year:'numeric'});
-    const typeLabel={shift:'Shift time change',day:'Day change',permanent:`Permanent break/lunch · ${r.dayOfWeek}s`,time:'Additional time',earlyleave:'Early leave + makeup'}[r.type]||r.type;
+    const typeLabel={shift:'Shift time change',day:'Day change',permanent:`Permanent break/lunch · ${r.dayOfWeek}s`,time:'Additional time',earlyleave:'Early leave + makeup',shadowto:'Shadowing — TO window'}[r.type]||r.type;
     const tz=ATZ[r.agent];
     const subDate=new Date(r.submittedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'});
     let detailHTML='', actionHTML='';
@@ -3772,7 +4199,7 @@ function renderReviewList(){
 function notifyAgentRequestResolved(req,status,extraNote){
   const webhook=slackAgentWebhooks[req.agent];
   if(!webhook) return;
-  const typeLabels={shift:'Shift time change',day:'Day change',permanent:'Permanent break/lunch',time:'Additional time',earlyleave:'Early leave + makeup'};
+  const typeLabels={shift:'Shift time change',day:'Day change',permanent:'Permanent break/lunch',time:'Additional time',earlyleave:'Early leave + makeup',shadowto:'Shadowing — TO window'};
   const typeLabel=typeLabels[req.type]||req.type;
   const dateDisp=new Date(req.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
   const icon=status==='approved'?'✅':'❌';
@@ -4031,7 +4458,7 @@ function reqClearAll(){
 
 // ── Transfers Only Tracker ─────────────────────────────────────
 // Activities that count as Transfers Only state
-const TO_ACTIVITIES=new Set(['Outbound','Project Time','1:1','All Hands','Ticket Time','Weekly Sync','Huddle']);
+const TO_ACTIVITIES=new Set(['Outbound','Project Time','1:1','All Hands','Ticket Time','Weekly Sync','Huddle','Training','Shadowing - TO']);
 const SLUSH_PER_DAY=20; // minutes
 
 function calcTransfersOnly(agent,day,fw){
@@ -4042,7 +4469,7 @@ function calcTransfersOnly(agent,day,fw){
     .filter(b=>TO_ACTIVITIES.has(b[0]))
     .reduce((s,b)=>s+(t2m(b[2])-t2m(b[1])),0);
   const online=blocks
-    .filter(b=>b[0]==='On Phones')
+    .filter(b=>b[0]==='On Phones'||b[0]==='Shadowing')
     .reduce((s,b)=>s+(t2m(b[2])-t2m(b[1])),0);
   const working=blocks.length>0;
   return{mins,online,working};
