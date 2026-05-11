@@ -3436,28 +3436,65 @@ function schedConfirmSave(agent,day,fw,blocks,explicitDateStr){
   document.getElementById('sched-confirm-modal').classList.add('open');
 }
 
-// Fill any uncovered time between shift start and end with On Phones.
-// On Phones acts as the base layer — everything else sits on top.
-// NON_PHONE activities are fixed in place; gaps between them get filled.
+// Resolve overlaps and fill gaps so On Phones is always the base layer.
+// Step 1: trim any On Phones blocks that overlap protected activities
+// Step 2: fill any remaining gaps between blocks with On Phones
 function fillGapsWithOnPhones(blocks){
   if(!blocks.length) return blocks;
-  // Sort and remove zero-length blocks
-  const sorted=blocks.filter(b=>t2m(b[2])>t2m(b[1])).sort((a,b)=>t2m(a[1])-t2m(b[1]));
-  if(!sorted.length) return sorted;
-  const shiftStart=t2m(sorted[0][1]);
-  const shiftEnd=t2m(sorted[sorted.length-1][2]);
+  const valid=blocks.filter(b=>t2m(b[2])>t2m(b[1]));
+  if(!valid.length) return valid;
+
+  // Separate On Phones from everything else
+  const protected_=valid.filter(b=>b[0]!=='On Phones');
+  let opBlocks=valid.filter(b=>b[0]==='On Phones');
+
+  // Step 1: trim On Phones around each protected block
+  const trimmedOP=[];
+  opBlocks.forEach(ob=>{
+    let segments=[{s:t2m(ob[1]),e:t2m(ob[2])}];
+    protected_.forEach(pb=>{
+      const ps=t2m(pb[1]),pe=t2m(pb[2]);
+      const next=[];
+      segments.forEach(seg=>{
+        if(ps<=seg.s&&pe>=seg.e){
+          // protected fully covers this segment — remove it
+        } else if(ps>seg.s&&pe<seg.e){
+          // protected splits segment in two
+          next.push({s:seg.s,e:ps});
+          next.push({s:pe,e:seg.e});
+        } else if(ps<=seg.s&&pe>seg.s&&pe<seg.e){
+          // protected clips left side
+          next.push({s:pe,e:seg.e});
+        } else if(ps>seg.s&&ps<seg.e&&pe>=seg.e){
+          // protected clips right side
+          next.push({s:seg.s,e:ps});
+        } else {
+          next.push(seg);
+        }
+      });
+      segments=next;
+    });
+    segments.forEach(seg=>{
+      if(seg.e>seg.s) trimmedOP.push(['On Phones',m2t(seg.s),m2t(seg.e)]);
+    });
+  });
+
+  // Combine protected + trimmed On Phones, sort
+  const all=[...protected_,...trimmedOP].sort((a,b)=>t2m(a[1])-t2m(b[1]));
+
+  // Step 2: fill any remaining gaps with On Phones
+  const shiftStart=t2m(all[0][1]);
+  const shiftEnd=t2m(all[all.length-1][2]);
   const result=[];
   let cursor=shiftStart;
-  sorted.forEach(b=>{
+  all.forEach(b=>{
     const bs=t2m(b[1]),be=t2m(b[2]);
-    // Fill gap before this block
     if(bs>cursor) result.push(['On Phones',m2t(cursor),m2t(bs)]);
     result.push(b);
     cursor=Math.max(cursor,be);
   });
-  // Fill any trailing gap (shouldn't happen but just in case)
   if(cursor<shiftEnd) result.push(['On Phones',m2t(cursor),m2t(shiftEnd)]);
-  // Merge adjacent On Phones blocks
+
   return mergeOP(result);
 }
 
