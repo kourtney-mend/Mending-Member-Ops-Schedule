@@ -3100,14 +3100,14 @@ function bamConfirmMove(){
   // Remove from source day — replace with On Phones
   const srcBlocks=JSON.parse(JSON.stringify(getRawBlocks(agent,day,fw,bam.dateStr)));
   srcBlocks[idx]=['On Phones',block[1],block[2]];
-  const cleanSrc=mergeOP(srcBlocks).filter(b=>t2m(b[2])>t2m(b[1]));
+  const cleanSrc=fillGapsWithOnPhones(mergeOP(srcBlocks).filter(b=>t2m(b[2])>t2m(b[1])));
 
   // Add to destination day
   const destFW=destDay==='Friday'?getFriWeekForDate(dateOfDay(destDay,weekOffset)):1;
   const destDateStr=toISO(dateOfDay(destDay,weekOffset));
   const destBlocks=JSON.parse(JSON.stringify(getRawBlocks(agent,destDay,destFW,destDateStr)));
   destBlocks.push([block[0],newStart,newEnd]);
-  destBlocks.sort((a,b)=>t2m(a[1])-t2m(b[1]));
+  const cleanDest=fillGapsWithOnPhones(destBlocks.sort((a,b)=>t2m(a[1])-t2m(b[1])));
 
   // Save source day
   const srcDateStr=bam.dateStr;
@@ -3124,10 +3124,10 @@ function bamConfirmMove(){
   if(destDay==='Friday'){
     if(!friOverrides[destFW]) friOverrides[destFW]={};
     if(!friOverrides[destFW][agent]) friOverrides[destFW][agent]={};
-    friOverrides[destFW][agent][destDateStr]=destBlocks;
+    friOverrides[destFW][agent][destDateStr]=cleanDest;
   } else {
     if(!schedOverrides[agent]) schedOverrides[agent]={};
-    schedOverrides[agent][destDateStr]=destBlocks;
+    schedOverrides[agent][destDateStr]=cleanDest;
   }
 
   closeBam();
@@ -3206,16 +3206,17 @@ function bamConfirmMoveAll(){
       aBlocks.push([act,agentNS,agentNE]);
     }
     aBlocks.sort((x,y)=>t2m(x[1])-t2m(y[1]));
+    const cleanBlocks=fillGapsWithOnPhones(aBlocks);
     const dateStr=bam.dateStr||toISO(dateOfDay(day,weekOffset));
     if(day==='Friday'){
       if(!friOverrides[fw]) friOverrides[fw]={};
       if(!friOverrides[fw][a]) friOverrides[fw][a]={};
-      friOverrides[fw][a][dateStr]=aBlocks;
+      friOverrides[fw][a][dateStr]=cleanBlocks;
     } else {
       if(!schedOverrides[a]) schedOverrides[a]={};
-      schedOverrides[a][dateStr]=aBlocks;
+      schedOverrides[a][dateStr]=cleanBlocks;
     }
-    notifyAgentScheduleChange(a,dateStr,aBlocks);
+    notifyAgentScheduleChange(a,dateStr,cleanBlocks);
   });
 
   closeBam();
@@ -3435,6 +3436,31 @@ function schedConfirmSave(agent,day,fw,blocks,explicitDateStr){
   document.getElementById('sched-confirm-modal').classList.add('open');
 }
 
+// Fill any uncovered time between shift start and end with On Phones.
+// On Phones acts as the base layer — everything else sits on top.
+// NON_PHONE activities are fixed in place; gaps between them get filled.
+function fillGapsWithOnPhones(blocks){
+  if(!blocks.length) return blocks;
+  // Sort and remove zero-length blocks
+  const sorted=blocks.filter(b=>t2m(b[2])>t2m(b[1])).sort((a,b)=>t2m(a[1])-t2m(b[1]));
+  if(!sorted.length) return sorted;
+  const shiftStart=t2m(sorted[0][1]);
+  const shiftEnd=t2m(sorted[sorted.length-1][2]);
+  const result=[];
+  let cursor=shiftStart;
+  sorted.forEach(b=>{
+    const bs=t2m(b[1]),be=t2m(b[2]);
+    // Fill gap before this block
+    if(bs>cursor) result.push(['On Phones',m2t(cursor),m2t(bs)]);
+    result.push(b);
+    cursor=Math.max(cursor,be);
+  });
+  // Fill any trailing gap (shouldn't happen but just in case)
+  if(cursor<shiftEnd) result.push(['On Phones',m2t(cursor),m2t(shiftEnd)]);
+  // Merge adjacent On Phones blocks
+  return mergeOP(result);
+}
+
 function schedConfirmApply(){
   if(!_pendingSchedSave) return;
   document.getElementById('sched-confirm-modal').classList.remove('open');
@@ -3445,7 +3471,9 @@ function schedConfirmApply(){
     renderAll();
     return;
   }
-  const{agent,day,fw,blocks,dateStr}=_pendingSchedSave;
+  const{agent,day,fw,dateStr}=_pendingSchedSave;
+  // Fill gaps with On Phones before saving
+  const blocks=fillGapsWithOnPhones(_pendingSchedSave.blocks);
   _pendingSchedSave=null;
   try{
     if(day==='Friday'){
@@ -3457,7 +3485,6 @@ function schedConfirmApply(){
       schedOverrides[agent][dateStr]=blocks;
     }
     save();
-
   }catch(e){console.error('schedConfirmApply save error:',e);}
   try{notifyAgentScheduleChange(agent,dateStr,blocks);}catch(e){console.error('notify error:',e);}
   renderAll();
@@ -3471,7 +3498,8 @@ function schedConfirmCancel(){
 function saveBlocksForDate(agent,day,fw,blocks){
   // Use the exact date captured when the modal opened — immune to weekOffset changes
   const dateStr=bam.dateStr||toISO(dateOfDay(day,bam.wo!==undefined?bam.wo:weekOffset));
-  const clean=blocks.filter(b=>t2m(b[2])>t2m(b[1])).sort((a,b)=>t2m(a[1])-t2m(b[1]));
+  // Fill any gaps with On Phones before showing confirmation
+  const clean=fillGapsWithOnPhones(blocks.filter(b=>t2m(b[2])>t2m(b[1])).sort((a,b)=>t2m(a[1])-t2m(b[1])));
   // Snap manager view to the edited day before showing confirmation
   mDay=day;
   if(day==='Friday') mFW=fw;
