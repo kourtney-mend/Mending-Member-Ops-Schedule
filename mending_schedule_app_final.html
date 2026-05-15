@@ -692,10 +692,8 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
       <p style="font-size:13px;color:var(--text-secondary);margin-bottom:.75rem">Move this block to a different day. It will be removed from the current day and added to the destination.</p>
       <div class="form-row">
         <div>
-          <label>Destination day</label>
-          <select id="bam-move-day" onchange="bamUpdateMovePreview()" style="width:100%;font-size:13px;padding:7px 9px;border:0.5px solid var(--border-mid);border-radius:var(--radius-md);background:var(--bg-primary);color:var(--text-primary);font-family:var(--font)">
-            <option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option>
-          </select>
+          <label>Destination date</label>
+          <input type="date" id="bam-move-date" onchange="bamUpdateMovePreview()" style="width:100%;font-size:13px;padding:7px 9px;border:0.5px solid var(--border-mid);border-radius:var(--radius-md);background:var(--bg-primary);color:var(--text-primary);font-family:var(--font)">
         </div>
         <div>
           <label>At time</label>
@@ -1592,11 +1590,15 @@ function gBlocks(agent,day,fw,tS,tF){
   }
   const someoneOOO=AGENTS.filter(a=>a!==agent&&ooo[a]&&ooo[a][dateStr]===true).length>0;
   // Only apply simplified coverage if there's no manual override for this agent on this date
-  // Manual overrides mean the manager has already customised this agent's schedule
   const hasManualOverride=day==='Friday'
     ?!!(friOverrides[fw]&&friOverrides[fw][agent]&&friOverrides[fw][agent][dateStr])
     :!!(schedOverrides[agent]&&schedOverrides[agent][dateStr]);
-  if(someoneOOO&&!hasManualOverride) return applyOOOCoverage(blocks);
+  if(someoneOOO&&!hasManualOverride){
+    // Ask manager whether to simplify this agent's schedule
+    const oooNames=AGENTS.filter(a=>a!==agent&&ooo[a]&&ooo[a][dateStr]===true).join(', ');
+    const simplify=confirm(`${oooNames} is OOO on this day.\n\nSimplify ${agent}'s schedule to inbound-only coverage?\n\nClick OK to simplify (removes non-essential activities).\nClick Cancel to keep ${agent}'s schedule as-is.`);
+    if(simplify) return applyOOOCoverage(blocks);
+  }
   return blocks;
 }
 // Merge proposed blocks into an existing schedule.
@@ -2983,12 +2985,13 @@ function bamShowMove(){
   document.getElementById('bam-delete-panel').style.display='none';
   document.getElementById('bam-add-panel').style.display='none';
   document.getElementById('bam-move-panel').style.display='block';
-  // Default destination = next day
-  const days=['Monday','Tuesday','Wednesday','Thursday','Friday'];
-  const curIdx=days.indexOf(bam.day);
-  const destDay=days[(curIdx+1)%5];
-  document.getElementById('bam-move-day').value=destDay;
-  // Default time = same as current block
+  document.getElementById('bam-move-all-panel').style.display='none';
+  // Default to next weekday from the current block's date
+  const srcDate=new Date((bam.dateStr||toISO(new Date()))+'T12:00:00');
+  srcDate.setDate(srcDate.getDate()+1);
+  // Skip to next weekday
+  while(srcDate.getDay()===0||srcDate.getDay()===6) srcDate.setDate(srcDate.getDate()+1);
+  document.getElementById('bam-move-date').value=toISO(srcDate);
   document.getElementById('bam-move-time').value=bam.block?bam.block[1]:'09:00';
   bamUpdateMovePreview();
 }
@@ -3022,23 +3025,36 @@ function bamUpdateCovPreview(){
 }
 
 function bamUpdateMovePreview(){
-  const destDay=document.getElementById('bam-move-day').value;
+  const destDateStr=document.getElementById('bam-move-date').value;
   const moveTime=document.getElementById('bam-move-time').value;
   const previewEl=document.getElementById('bam-move-preview');
   const covEl=document.getElementById('bam-move-cov');
-  if(!bam.block||!moveTime){previewEl.style.display='none';return;}
+  if(!bam.block||!destDateStr||!moveTime){previewEl.style.display='none';covEl.innerHTML='';return;}
+
+  const destDate=new Date(destDateStr+'T12:00:00');
+  const destDay=destDate.toLocaleDateString('en-US',{weekday:'long'});
+  if(!DAYS.includes(destDay)){
+    previewEl.style.display='block';
+    previewEl.innerHTML='<span style="color:#A32D2D">Please select a weekday (Mon–Fri)</span>';
+    covEl.innerHTML='';return;
+  }
 
   const dur=t2m(bam.block[2])-t2m(bam.block[1]);
   const newStart=bamGetAgentTimeRaw(moveTime);
   const newEnd=m2t(t2m(newStart)+dur);
   const tz=ATZ[bam.agent];
+  const dateDisp=destDate.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
 
   previewEl.style.display='block';
-  previewEl.innerHTML=`Moving <strong>${bam.block[0]}</strong> to <strong>${destDay}</strong> at <strong>${m2d(t2m(newStart))}–${m2d(t2m(newEnd))} ${tz}</strong>`;
+  previewEl.innerHTML=`Moving <strong>${bam.block[0]}</strong> to <strong>${dateDisp}</strong> at <strong>${m2d(t2m(newStart))}–${m2d(t2m(newEnd))} ${tz}</strong>`;
 
   // Coverage preview for destination day
-  const destFW=destDay==='Friday'?getFriWeekForDate(dateOfDay(destDay,weekOffset)):1;
-  const destBlocks=JSON.parse(JSON.stringify(getRawBlocks(bam.agent,destDay,destFW)));
+  const destFW=destDay==='Friday'?getFriWeekForDate(destDate):1;
+  // Find weekOffset for dest date
+  const savedWO=weekOffset;
+  for(let wo=-52;wo<=52;wo++){if(toISO(dateOfDay(destDay,wo))===destDateStr){weekOffset=wo;break;}}
+  const destBlocks=JSON.parse(JSON.stringify(getRawBlocks(bam.agent,destDay,destFW,destDateStr)));
+  weekOffset=savedWO;
   destBlocks.push([bam.block[0],newStart,newEnd]);
   destBlocks.sort((a,b)=>t2m(a[1])-t2m(b[1]));
   covEl.innerHTML=bamCovHTML(destDay,destFW,bam.agent,destBlocks);
@@ -3089,9 +3105,15 @@ function bamCovHTML(day,fw,editAgent,editBlocks){
 }
 
 function bamConfirmMove(){
-  const destDay=document.getElementById('bam-move-day').value;
+  const destDateStr=document.getElementById('bam-move-date').value;
   const moveTime=document.getElementById('bam-move-time').value;
+  if(!destDateStr){alert('Please select a destination date.');return;}
   if(!moveTime){alert('Please enter a time.');return;}
+
+  const destDate=new Date(destDateStr+'T12:00:00');
+  const destDay=destDate.toLocaleDateString('en-US',{weekday:'long'});
+  if(!DAYS.includes(destDay)){alert('Please select a weekday (Mon–Fri).');return;}
+
   const{agent,day,fw,idx,block}=bam;
   const newStart=bamGetAgentTimeRaw(moveTime);
   const dur=t2m(block[2])-t2m(block[1]);
@@ -3103,9 +3125,12 @@ function bamConfirmMove(){
   const cleanSrc=fillGapsWithOnPhones(mergeOP(srcBlocks).filter(b=>t2m(b[2])>t2m(b[1])));
 
   // Add to destination day
-  const destFW=destDay==='Friday'?getFriWeekForDate(dateOfDay(destDay,weekOffset)):1;
-  const destDateStr=toISO(dateOfDay(destDay,weekOffset));
+  const destFW=destDay==='Friday'?getFriWeekForDate(destDate):1;
+  // Find weekOffset for dest date to read correct blocks
+  const savedWO=weekOffset;
+  for(let wo=-52;wo<=52;wo++){if(toISO(dateOfDay(destDay,wo))===destDateStr){weekOffset=wo;break;}}
   const destBlocks=JSON.parse(JSON.stringify(getRawBlocks(agent,destDay,destFW,destDateStr)));
+  weekOffset=savedWO;
   destBlocks.push([block[0],newStart,newEnd]);
   const cleanDest=fillGapsWithOnPhones(destBlocks.sort((a,b)=>t2m(a[1])-t2m(b[1])));
 
