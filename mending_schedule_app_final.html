@@ -2210,14 +2210,19 @@ function applyNoActivity(){
   const isCurrentlyOn=isOB?(indefiniteNoOB||isWeekNoOB()):(indefiniteNoPT||isWeekNoPT());
 
   if(isCurrentlyOn){
-    // Turn back on — clear everything
+    // Turn back on — clear indefinite flag and only remove future/current entries
+    const todayStr=toISO(new Date());
     if(isOB){
       indefiniteNoOB=false;
-      // Clear all weekly noOB entries for all weeks
-      Object.keys(noOB).forEach(ds=>AGENTS.forEach(a=>{if(noOB[ds])noOB[ds][a]=false;}));
+      // Only clear from today forward — preserve past entries
+      Object.keys(noOB).forEach(ds=>{
+        if(ds>=todayStr) AGENTS.forEach(a=>{if(noOB[ds])noOB[ds][a]=false;});
+      });
     } else {
       indefiniteNoPT=false;
-      Object.keys(noPT).forEach(ds=>AGENTS.forEach(a=>{if(noPT[ds])noPT[ds][a]=false;}));
+      Object.keys(noPT).forEach(ds=>{
+        if(ds>=todayStr) AGENTS.forEach(a=>{if(noPT[ds])noPT[ds][a]=false;});
+      });
     }
   } else if(scope==='indefinite'){
     // Turn off indefinitely
@@ -2236,7 +2241,9 @@ function applyNoActivity(){
 }
 
 function applyNoActivityWeek(isOB){
-  const weekDates=DAYS.map(d=>toISO(dateOfDay(d,weekOffset)));
+  // Only apply to today and future dates in the current week
+  const todayStr=toISO(new Date());
+  const weekDates=DAYS.map(d=>toISO(dateOfDay(d,weekOffset))).filter(ds=>ds>=todayStr);
   weekDates.forEach(ds=>{
     if(isOB){if(!noOB[ds])noOB[ds]={};AGENTS.forEach(a=>{noOB[ds][a]=true;});}
     else{if(!noPT[ds])noPT[ds]={};AGENTS.forEach(a=>{noPT[ds][a]=true;});}
@@ -2263,6 +2270,7 @@ function updateNoOBWeekBtn(){
     ptBtn.style.borderColor=ptOn?'#C0DD97':'var(--border-light)';
   }
 }
+function setMDay(d){mDay=d;renderManager();}
 function setMgrFriWeek(w){mFW=w;renderManager();updateNoOBWeekBtn();}
 function navWeek(dir){weekOffset+=dir;renderAll();updateNoOBWeekBtn();}
 
