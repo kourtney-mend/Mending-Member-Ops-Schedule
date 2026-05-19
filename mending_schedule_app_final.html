@@ -1417,7 +1417,50 @@ function applyOOO(){
 
   if(type==='full'){
     ooo[agent][dateStr]=true;
-    save();renderAll();
+    save();
+
+    // Ask once about all other working agents — not the OOO agent themselves
+    const otherWorking=AGENTS.filter(a=>{
+      if(a===agent) return false; // skip the OOO agent
+      if(ooo[a]&&ooo[a][dateStr]===true) return false; // skip agents already OOO
+      // Skip if they already have a manual override for this date
+      const d=new Date(dateStr+'T12:00:00');
+      const dayN=d.toLocaleDateString('en-US',{weekday:'long'});
+      const fw2=dayN==='Friday'?getFriWeekForDate(d):1;
+      const hasOverride=dayN==='Friday'
+        ?!!(friOverrides[fw2]&&friOverrides[fw2][a]&&friOverrides[fw2][a][dateStr])
+        :!!(schedOverrides[a]&&schedOverrides[a][dateStr]);
+      return !hasOverride;
+    });
+
+    if(otherWorking.length){
+      const names=otherWorking.join(' and ');
+      const simplify=confirm(`${agent} is marked OOO on ${new Date(dateStr+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})}.\n\nSimplify ${names}'s schedule to inbound-only coverage?\n\nOK = simplify all  |  Cancel = keep schedules as-is`);
+      if(simplify){
+        // Apply coverage to all other working agents at once
+        const d=new Date(dateStr+'T12:00:00');
+        const dayN=d.toLocaleDateString('en-US',{weekday:'long'});
+        const savedWO=weekOffset;
+        for(let wo=-52;wo<=52;wo++){if(toISO(dateOfDay(dayN,wo))===dateStr){weekOffset=wo;break;}}
+        const fw2=dayN==='Friday'?getFriWeekForDate(d):1;
+        otherWorking.forEach(a=>{
+          const blocks=getRawBlocks(a,dayN,fw2,dateStr);
+          const simplified=applyOOOCoverage(blocks);
+          if(dayN==='Friday'){
+            if(!friOverrides[fw2]) friOverrides[fw2]={};
+            if(!friOverrides[fw2][a]) friOverrides[fw2][a]={};
+            friOverrides[fw2][a][dateStr]=simplified;
+          } else {
+            if(!schedOverrides[a]) schedOverrides[a]={};
+            schedOverrides[a][dateStr]=simplified;
+          }
+        });
+        weekOffset=savedWO;
+        save();
+      }
+    }
+
+    renderAll();
     closeOooModal();
     return;
   }
@@ -1626,12 +1669,7 @@ function gBlocks(agent,day,fw,tS,tF){
   const hasManualOverride=day==='Friday'
     ?!!(friOverrides[fw]&&friOverrides[fw][agent]&&friOverrides[fw][agent][dateStr])
     :!!(schedOverrides[agent]&&schedOverrides[agent][dateStr]);
-  if(someoneOOO&&!hasManualOverride){
-    // Ask manager whether to simplify this agent's schedule
-    const oooNames=AGENTS.filter(a=>a!==agent&&ooo[a]&&ooo[a][dateStr]===true).join(', ');
-    const simplify=confirm(`${oooNames} is OOO on this day.\n\nSimplify ${agent}'s schedule to inbound-only coverage?\n\nClick OK to simplify (removes non-essential activities).\nClick Cancel to keep ${agent}'s schedule as-is.`);
-    if(simplify) return applyOOOCoverage(blocks);
-  }
+  if(someoneOOO&&!hasManualOverride) return applyOOOCoverage(blocks);
   return blocks;
 }
 // Merge proposed blocks into an existing schedule.
