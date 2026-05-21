@@ -235,6 +235,21 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
 
   <!-- REQUEST CHANGE -->
   <div id="view-request" class="view">
+    <!-- GitHub sync for agents -->
+    <div class="card" id="agent-gh-sync-card">
+      <div class="card-title">☁ Connect to GitHub <span style="font-size:12px;font-weight:400;color:var(--text-tertiary)">— required to submit requests</span></div>
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:1rem">Enter the GitHub token your manager sent you. Only needs to be done once per device.</p>
+      <div style="margin-bottom:8px">
+        <label>GitHub token</label>
+        <input type="password" id="agent-gh-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+          style="width:100%;font-size:13px;padding:7px 9px;border:0.5px solid var(--border-mid);border-radius:var(--radius-md);background:var(--bg-primary);color:var(--text-primary);font-family:var(--font);margin-top:4px">
+        <div style="font-size:11px;color:var(--text-tertiary);margin-top:4px">Stored in your browser only — never shared anywhere except GitHub.</div>
+      </div>
+      <div class="btn-row">
+        <button class="bp" onclick="saveAgentGHToken()">Save token</button>
+      </div>
+      <div id="agent-gh-status" style="font-size:12px;margin-top:8px"></div>
+    </div>
     <div class="alert-box a-info" style="margin-bottom:1rem">
       <span>Submit a schedule change request. Your manager will review and approve or deny it. Approved changes will update your schedule automatically.</span>
     </div>
@@ -1061,9 +1076,7 @@ const GH_KEY='mending-github-v1';
 const GH_FILE='schedule-data.json';
 const GH_PUBLIC_USER='kourtney-mend';
 const GH_PUBLIC_REPO='Mending-Member-Ops-Schedule';
-// Shared write token — lets agents push requests without personal GitHub setup
-// This token only has access to this one repo
-const GH_SHARED_TOKEN='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';
+const GH_SHARED_TOKEN='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';
 let ghUser=GH_PUBLIC_USER,ghRepo=GH_PUBLIC_REPO,ghToken='';
 
 function loadGitHubSettings(){
@@ -1113,9 +1126,8 @@ function buildGHPayload(){
 }
 
 async function pushToGitHub(silent=false){
-  // Use personal token if set, otherwise fall back to shared token
   const token=ghToken||GH_SHARED_TOKEN;
-  if(!ghUser||!ghRepo||!token||token==='PASTE_YOUR_TOKEN_HERE'){
+  if(!ghUser||!ghRepo||!token){
     if(!silent) document.getElementById('gh-status').innerHTML='<span style="color:#A32D2D">✗ Please fill in all GitHub settings first.</span>';
     return false;
   }
@@ -1334,10 +1346,13 @@ function load(){
   // Only needs username + repo — no token required for reading
   if(ghUser&&ghRepo){
     setSS('loading');
+    // 5 second max — if pull fails or hangs, app still loads
+    const pullTimeout=setTimeout(()=>setSS('saved'),5000);
     pullFromGitHub().then(ok=>{
-      try{if(ok){renderAll();updateReqBadge();}}catch(e){console.error('renderAll after pull:',e);}
+      clearTimeout(pullTimeout);
+      try{if(ok){renderAll();updateReqBadge();}}catch(e){}
       setSS('saved');
-    }).catch(()=>setSS('saved'));
+    }).catch(()=>{clearTimeout(pullTimeout);setSS('saved');});
   } else {
     setSS('saved');
   }
@@ -2331,6 +2346,32 @@ function updateNoOBWeekBtn(){
   }
 }
 function setMDay(d){mDay=d;renderManager();}
+function saveAgentGHToken(){
+  const token=document.getElementById('agent-gh-token').value.trim();
+  if(!token){alert('Please enter your token.');return;}
+  if(!token.startsWith('ghp_')){alert('Token should start with ghp_ — check that you copied it correctly.');return;}
+  // Save using the same GitHub settings storage
+  ghToken=token;
+  localStorage.setItem(GH_KEY,JSON.stringify({user:ghUser,repo:ghRepo,token:ghToken}));
+  document.getElementById('agent-gh-status').innerHTML='<span style="color:#27500A">✓ Token saved! Your requests will now sync to the team schedule.</span>';
+  document.getElementById('agent-gh-token').value='';
+  // Hide the card after saving
+  setTimeout(()=>{
+    const card=document.getElementById('agent-gh-sync-card');
+    if(card) card.style.display='none';
+  },2000);
+}
+
+function initAgentGHCard(){
+  // Hide the GitHub card if token is already saved
+  const card=document.getElementById('agent-gh-sync-card');
+  if(!card) return;
+  if(ghToken){
+    card.style.display='none';
+  } else {
+    card.style.display='block';
+  }
+}
 function setMgrFriWeek(w){mFW=w;renderManager();updateNoOBWeekBtn();}
 function navWeek(dir){weekOffset+=dir;renderAll();updateNoOBWeekBtn();}
 
@@ -3982,7 +4023,6 @@ async function sendSlackNotification(webhookUrl,req){
 
 function saveRequests(){
   localStorage.setItem(RQK,JSON.stringify(requests));
-  // Always push to GitHub — shared token lets agents push too
   clearTimeout(saveRequests._timer);
   saveRequests._timer=setTimeout(()=>{
     pushToGitHub(true);
@@ -4312,7 +4352,8 @@ function submitRequest(){
   saveRequests();updateReqBadge();reqClear();
   elMakeupDays=[];renderElMakeupDays();
 
-  // Send Slack notification
+  // Send Slack notification — this is the primary way you receive requests
+  // since agents can't push to GitHub directly
   loadSlackSettings();
   const webhookToUse=slackWebhook||remoteManagerWebhook||
     (()=>{try{const s=localStorage.getItem(SLACK_KEY);if(s){const d=JSON.parse(s);return d.webhook||'';}return'';}catch(e){return'';}})();
@@ -5039,6 +5080,7 @@ function switchTab(tab){
     onReqTypeChange();
     const agent=document.getElementById('req-agent').value;
     renderMyRequests(agent);
+    initAgentGHCard();
   }
   if(tab==='review') renderReviewList();
 }
