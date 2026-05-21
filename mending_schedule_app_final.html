@@ -1106,6 +1106,9 @@ function buildGHPayload(){
   return{
     schedOverrides,friOverrides,noOB,noPT,noHoliday,ooo,
     requests,
+    // Share credentials so agents can push requests from their browsers
+    _managerWebhook:slackWebhook||'',
+    _ghToken:ghToken||'',
     _saved:new Date().toISOString()
   };
 }
@@ -1205,6 +1208,9 @@ async function pullFromGitHub(){
     if(raw.noPT) noPT=mergeDeep(noPT,raw.noPT);
     if(raw.noHoliday) noHoliday=mergeDeep(noHoliday,raw.noHoliday);
     if(raw.ooo) ooo=mergeDeep(ooo,raw.ooo);
+    // Read manager webhook and token from GitHub so agents can submit and notify
+    if(raw._managerWebhook) remoteManagerWebhook=raw._managerWebhook;
+    if(raw._ghToken&&!ghToken) ghToken=raw._ghToken; // only set if agent has no token
 
     // Merge requests — add any from GitHub that don't exist locally
     // Local always wins (preserves your approved/denied status)
@@ -3782,6 +3788,8 @@ const SLACK_KEY='mending-slack-v2';
 let slackWebhook='';
 let slackManagerName='';
 let slackAgentWebhooks={Ebony:'',Marisa:'',Ky:''};
+// Webhook read from GitHub — works on agent browsers that have no local Slack settings
+let remoteManagerWebhook='';
 
 function loadSlackSettings(){
   try{
@@ -4309,16 +4317,16 @@ function submitRequest(){
   requests.push(req);
   saveRequests();updateReqBadge();reqClear();
   elMakeupDays=[];renderElMakeupDays();
-  // Re-read Slack settings fresh from localStorage before sending
-  // in case slackWebhook variable wasn't populated at load time
+
+  // Get best available webhook — local settings first, then webhook from GitHub data
   loadSlackSettings();
-  if(slackWebhook) sendSlackNotification(slackWebhook,req);
-  else{
-    // Try reading directly from localStorage as fallback
-    try{
-      const s=localStorage.getItem(SLACK_KEY);
-      if(s){const d=JSON.parse(s);if(d.webhook) sendSlackNotification(d.webhook,req);}
-    }catch(e){}
+  const webhookToUse=slackWebhook||remoteManagerWebhook||
+    (()=>{try{const s=localStorage.getItem(SLACK_KEY);if(s){const d=JSON.parse(s);return d.webhook||'';}return'';}catch(e){return'';}})();
+
+  if(webhookToUse){
+    sendSlackNotification(webhookToUse,req).then(ok=>{
+      if(!ok) console.warn('Slack notification failed for request',req.id);
+    });
   }
   const dateDisp=new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
   document.getElementById('req-status').innerHTML=`<span style="color:#27500A">✓ Request submitted for ${dateDisp}. Your manager will review it shortly.</span>`;
