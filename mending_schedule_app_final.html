@@ -3827,6 +3827,14 @@ let reqBlocks=[]; // blocks being built for current request
 
 // ── Slack notifications ───────────────────────────────────────
 const SLACK_KEY='mending-slack-v2';
+// Hardcoded webhooks — safe in private repo
+const SLACK_HARDCODED_WEBHOOK='https://hooks.slack.com/services/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';
+const SLACK_HARDCODED_AGENTS={
+  Ebony:'https://hooks.slack.com/services/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',
+  Marisa:'https://hooks.slack.com/services/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',
+  Ky:'https://hooks.slack.com/services/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'
+};
+const SLACK_HARDCODED_MANAGER_NAME='Kourtney';
 let slackWebhook='';
 let slackManagerName='';
 let slackAgentWebhooks={Ebony:'',Marisa:'',Ky:''};
@@ -3887,16 +3895,14 @@ function testSlackNotification(){
 
 // Send a schedule change DM to an agent when their schedule is updated today
 function notifyAgentScheduleChange(agent,dateStr,blocks){
-  // Re-read settings fresh to guarantee we have the latest saved webhook
   loadSlackSettings();
-  const webhook=slackAgentWebhooks[agent];
+  const webhook=slackAgentWebhooks[agent]||SLACK_HARDCODED_AGENTS[agent];
   if(!webhook) return;
-  // Only notify for today's date
   if(dateStr!==toISO(new Date())) return;
   const tz=ATZ[agent];
   const dateDisp=new Date(dateStr+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
   const blockLines=blocks.map(b=>`• ${b[0]}: ${m2d(t2m(b[1]))}–${m2d(t2m(b[2]))} ${tz}`).join('\n');
-  const text=`:calendar: *Your schedule has been updated for ${dateDisp}*\n\n${blockLines}\n\n_Questions? Reach out to ${slackManagerName||'your manager'}._`;
+  const text=`:calendar: *Your schedule has been updated for ${dateDisp}*\n\n${blockLines}\n\n_Questions? Reach out to ${slackManagerName||SLACK_HARDCODED_MANAGER_NAME||'your manager'}._`;
   sendSlackNotification(webhook,{_raw:text});
 }
 
@@ -3905,7 +3911,7 @@ async function sendTodaySchedules(){
   const statusEl=document.getElementById('send-schedules-status');
 
   // Check if any agent webhooks are configured
-  const configured=AGENTS.filter(a=>slackAgentWebhooks[a]);
+  const configured=AGENTS.filter(a=>slackAgentWebhooks[a]||SLACK_HARDCODED_AGENTS[a]);
   if(!configured.length){
     statusEl.innerHTML='<span style="color:#A32D2D">No agent webhooks set up. Go to Review requests → ⚙ Slack settings.</span>';
     setTimeout(()=>statusEl.textContent='',4000);
@@ -3930,7 +3936,7 @@ async function sendTodaySchedules(){
 
   let sent=0, skipped=0;
   for(const agent of AGENTS){
-    const webhook=slackAgentWebhooks[agent];
+    const webhook=slackAgentWebhooks[agent]||SLACK_HARDCODED_AGENTS[agent];
     if(!webhook){skipped++;continue;}
 
     const tz=ATZ[agent];
@@ -4024,9 +4030,40 @@ async function sendSlackNotification(webhookUrl,req){
 function saveRequests(){
   localStorage.setItem(RQK,JSON.stringify(requests));
   clearTimeout(saveRequests._timer);
-  saveRequests._timer=setTimeout(()=>{
-    pushToGitHub(true);
-  },1500);
+  saveRequests._timer=setTimeout(()=>pushRequestsToGitHub(),1500);
+}
+
+async function pushRequestsToGitHub(){
+  const token=ghToken||GH_SHARED_TOKEN;
+  if(!token||!ghUser||!ghRepo) return;
+  try{
+    // Read current file first so we only update the requests field
+    const url=`https://api.github.com/repos/${ghUser}/${ghRepo}/contents/${GH_FILE}`;
+    const getResp=await fetch(url,{
+      headers:{'Authorization':`Bearer ${token}`,'Accept':'application/vnd.github+json'}
+    });
+    if(!getResp.ok) return;
+    const fileData=await getResp.json();
+    const sha=fileData.sha;
+    // Decode existing content and merge requests
+    const existing=JSON.parse(decodeURIComponent(escape(atob(fileData.content.replace(/\n/g,'')))));
+    // Merge requests — add new ones, keep existing ones
+    const existingIds=new Set((existing.requests||[]).map(r=>r.id));
+    const newRequests=[...(existing.requests||[]),...requests.filter(r=>!existingIds.has(r.id))];
+    // Also update with any status changes from local (manager may have approved)
+    const merged=newRequests.map(r=>{
+      const local=requests.find(l=>l.id===r.id);
+      return local||r;
+    });
+    existing.requests=merged;
+    // Push back
+    const content=btoa(unescape(encodeURIComponent(JSON.stringify(existing,null,2))));
+    await fetch(url,{
+      method:'PUT',
+      headers:{'Authorization':`Bearer ${token}`,'Accept':'application/vnd.github+json','Content-Type':'application/json'},
+      body:JSON.stringify({message:'Request update',content,sha})
+    });
+  }catch(e){console.error('pushRequestsToGitHub:',e);}
 }
 function loadRequests(){
   try{const r=localStorage.getItem(RQK);if(r)requests=JSON.parse(r);}catch(e){}
@@ -4355,9 +4392,9 @@ function submitRequest(){
   // Send Slack notification — this is the primary way you receive requests
   // since agents can't push to GitHub directly
   loadSlackSettings();
-  const webhookToUse=slackWebhook||remoteManagerWebhook||
+  const webhookToUse=slackWebhook||remoteManagerWebhook||SLACK_HARDCODED_WEBHOOK||
     (()=>{try{const s=localStorage.getItem(SLACK_KEY);if(s){const d=JSON.parse(s);return d.webhook||'';}return'';}catch(e){return'';}})();
-  if(webhookToUse) sendSlackNotification(webhookToUse,req);
+  if(webhookToUse&&webhookToUse!=='PASTE_SLACK_WEBHOOK_HERE') sendSlackNotification(webhookToUse,req);
 
   const dateDisp=new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
   document.getElementById('req-status').innerHTML=`<span style="color:#27500A">✓ Request submitted for ${dateDisp}. Your manager will review it shortly.</span>`;
@@ -4553,7 +4590,7 @@ function renderReviewList(){
 
 // Notify agent when their request is approved or denied
 function notifyAgentRequestResolved(req,status,extraNote){
-  const webhook=slackAgentWebhooks[req.agent];
+  const webhook=slackAgentWebhooks[req.agent]||SLACK_HARDCODED_AGENTS[req.agent];
   if(!webhook) return;
   const typeLabels={shift:'Shift time change',day:'Day change',permanent:'Permanent break/lunch',time:'Additional time',earlyleave:'Early leave + makeup',shadowto:'Shadowing — TO window'};
   const typeLabel=typeLabels[req.type]||req.type;
@@ -4680,7 +4717,7 @@ function resolveEarlyLeaveDay(reqId,makeupDate,statusVal){
   } else {
     // Notify per day decision
     const makeupDisp=new Date(makeupDate+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
-    const webhook=slackAgentWebhooks[req.agent];
+    const webhook=slackAgentWebhooks[req.agent]||SLACK_HARDCODED_AGENTS[req.agent];
     if(webhook){
       const icon=statusVal==='approved'?'✅':'❌';
       const text=`${icon} *Your makeup day on ${makeupDisp} has been ${statusVal}*${statusVal==='approved'?` — ${approvedAct} ${req.elMakeup.find(d=>d.date===makeupDate)?.when||''} your shift`:''}\n_Your manager is still reviewing other makeup days._`;
