@@ -1334,7 +1334,7 @@ function load(){
   if(ghUser&&ghRepo){
     setSS('loading');
     pullFromGitHub().then(ok=>{
-      if(ok){renderAll();}
+      if(ok){renderAll();updateReqBadge();}
       setSS('saved');
     });
   } else {
@@ -3994,12 +3994,6 @@ function saveRequests(){
 function loadRequests(){
   try{const r=localStorage.getItem(RQK);if(r)requests=JSON.parse(r);}catch(e){}
   updateReqBadge();
-  // Pull from GitHub to get requests submitted by other browsers/agents
-  if(ghUser&&ghRepo){
-    pullFromGitHub().then(ok=>{
-      if(ok){renderReviewList();updateReqBadge();}
-    });
-  }
 }
 
 function updateReqBadge(){
