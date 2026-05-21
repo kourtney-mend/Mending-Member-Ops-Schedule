@@ -1335,9 +1335,9 @@ function load(){
   if(ghUser&&ghRepo){
     setSS('loading');
     pullFromGitHub().then(ok=>{
-      if(ok){renderAll();updateReqBadge();}
+      try{if(ok){renderAll();updateReqBadge();}}catch(e){console.error('renderAll after pull:',e);}
       setSS('saved');
-    });
+    }).catch(()=>setSS('saved'));
   } else {
     setSS('saved');
   }
@@ -4899,12 +4899,12 @@ function renderTransfersOnly(){
 }
 
 function renderAll(){
-  try{renderManager();}catch(e){console.error('renderManager error:',e);}
-  try{renderAgent();}catch(e){console.error('renderAgent error:',e);}
-  if(document.getElementById('view-coverage').classList.contains('active')){try{renderCovTab();}catch(e){}}
-  if(document.getElementById('view-transfers').classList.contains('active')){try{renderTransfersOnly();}catch(e){}}
-  updateReqBadge();
-  updateNoOBWeekBtn();
+  try{renderManager();}catch(e){console.error('renderManager:',e);}
+  try{renderAgent();}catch(e){console.error('renderAgent:',e);}
+  try{if(document.getElementById('view-coverage').classList.contains('active'))renderCovTab();}catch(e){}
+  try{if(document.getElementById('view-transfers').classList.contains('active'))renderTransfersOnly();}catch(e){}
+  try{updateReqBadge();}catch(e){}
+  try{updateNoOBWeekBtn();}catch(e){}
 }
 
 // ── Copy from previous week ───────────────────────────────────
@@ -5098,7 +5098,12 @@ function isToday(day,wo){
     hideTimer=setTimeout(()=>{card.style.display='none';},80);
   });
 })();
-setSS('loading');populateSelects();buildLegend();loadGitHubSettings();load();loadRequests();loadSlackSettings();
+try{
+  setSS('loading');populateSelects();buildLegend();loadGitHubSettings();load();loadRequests();loadSlackSettings();
+}catch(e){
+  console.error('Init error:',e);
+  setSS('saved'); // always show saved so app is usable even if something fails
+}
 setInterval(()=>{
   renderManager();renderAgent();
   // Pull latest from GitHub every 60s
