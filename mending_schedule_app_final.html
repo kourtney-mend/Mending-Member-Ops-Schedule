@@ -1106,9 +1106,7 @@ function buildGHPayload(){
   return{
     schedOverrides,friOverrides,noOB,noPT,noHoliday,ooo,
     requests,
-    // Share credentials so agents can push requests from their browsers
     _managerWebhook:slackWebhook||'',
-    _ghToken:ghToken||'',
     _saved:new Date().toISOString()
   };
 }
@@ -1214,7 +1212,6 @@ async function _doPullFromGitHub(){
     if(raw.ooo) ooo=mergeDeep(ooo,raw.ooo);
     // Read manager webhook and token from GitHub so agents can submit and notify
     if(raw._managerWebhook) remoteManagerWebhook=raw._managerWebhook;
-    if(raw._ghToken&&!ghToken) ghToken=raw._ghToken; // only set if agent has no token
 
     // Merge requests — add any from GitHub that don't exist locally
     // Local always wins (preserves your approved/denied status)
