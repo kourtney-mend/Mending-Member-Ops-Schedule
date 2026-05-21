@@ -1162,10 +1162,14 @@ let _ghPullBlocked=false; // block pulls while a save is in progress
 
 async function pullFromGitHub(){
   if(!ghUser||!ghRepo) return false;
-  if(_ghPullBlocked) return false; // don't overwrite local changes mid-save
+  if(_ghPullBlocked) return false;
+  // Timeout after 8 seconds so the app never gets stuck on Loading...
+  const timeout=new Promise(resolve=>setTimeout(()=>resolve(false),8000));
+  return Promise.race([_doPullFromGitHub(),timeout]);
+}
+
+async function _doPullFromGitHub(){
   try{
-    // Try GitHub Pages URL first (works for both public and private via Pages)
-    // Then fall back to raw.githubusercontent.com
     const pageUrl=`https://${ghUser}.github.io/${ghRepo}/${GH_FILE}?t=${Date.now()}`;
     const rawUrl=`https://raw.githubusercontent.com/${ghUser}/${ghRepo}/main/${GH_FILE}?t=${Date.now()}`;
 
@@ -3982,13 +3986,8 @@ async function sendSlackNotification(webhookUrl,req){
 function saveRequests(){
   localStorage.setItem(RQK,JSON.stringify(requests));
   clearTimeout(saveRequests._timer);
-  saveRequests._timer=setTimeout(async()=>{
-    if(ghUser&&ghRepo&&ghToken){
-      const ok=await pushToGitHub(true);
-      console.log('saveRequests GitHub push:',ok?'✓ success':'✗ failed','token present:',!!ghToken,'requests count:',requests.length);
-    } else {
-      console.warn('saveRequests: no GitHub push — user:',ghUser,'repo:',ghRepo,'token:',!!ghToken);
-    }
+  saveRequests._timer=setTimeout(()=>{
+    if(ghUser&&ghRepo&&ghToken) pushToGitHub(true);
   },1500);
 }
 function loadRequests(){
@@ -4315,31 +4314,12 @@ function submitRequest(){
   saveRequests();updateReqBadge();reqClear();
   elMakeupDays=[];renderElMakeupDays();
 
-  // Diagnostic — show exactly what's happening with Slack and GitHub
-  const diagEl=document.getElementById('req-status');
-
-  // Get best available webhook
+  // Send Slack notification
   loadSlackSettings();
   const webhookToUse=slackWebhook||remoteManagerWebhook||
     (()=>{try{const s=localStorage.getItem(SLACK_KEY);if(s){const d=JSON.parse(s);return d.webhook||'';}return'';}catch(e){return'';}})();
+  if(webhookToUse) sendSlackNotification(webhookToUse,req);
 
-  const hasToken=!!(ghToken);
-  const hasWebhook=!!(webhookToUse);
-  const dateDisp=new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
-
-  diagEl.innerHTML=`<span style="color:#27500A">✓ Request submitted for ${dateDisp}.</span>
-    <div style="margin-top:6px;font-size:11px;color:var(--text-tertiary);font-family:monospace;background:var(--bg-secondary);padding:6px 8px;border-radius:4px">
-      Slack webhook: ${hasWebhook?'✓ found ('+webhookToUse.slice(0,40)+'...)':'✗ MISSING'}
-      <br>GitHub token: ${hasToken?'✓ found':'✗ MISSING — request will not sync to manager'}
-      <br>remoteWebhook: ${remoteManagerWebhook?'✓ ('+remoteManagerWebhook.slice(0,30)+'...)':'✗ empty'}
-      <br>slackWebhook var: ${slackWebhook?'✓':'✗ empty'}
-    </div>`;
-
-  if(webhookToUse){
-    sendSlackNotification(webhookToUse,req).then(ok=>{
-      diagEl.innerHTML+=`<div style="font-size:11px;font-family:monospace;color:${ok?'#27500A':'#A32D2D'}">Slack send: ${ok?'✓ sent':'✗ failed'}</div>`;
-    });
-  }
   const dateDisp=new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
   document.getElementById('req-status').innerHTML=`<span style="color:#27500A">✓ Request submitted for ${dateDisp}. Your manager will review it shortly.</span>`;
   renderMyRequests(agent);
