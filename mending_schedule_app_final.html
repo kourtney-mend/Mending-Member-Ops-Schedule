@@ -1105,6 +1105,7 @@ function ghApiUrl(){
 function buildGHPayload(){
   return{
     schedOverrides,friOverrides,noOB,noPT,noHoliday,ooo,
+    requests,
     _saved:new Date().toISOString()
   };
 }
@@ -1205,6 +1206,19 @@ async function pullFromGitHub(){
     if(raw.noHoliday) noHoliday=mergeDeep(noHoliday,raw.noHoliday);
     if(raw.ooo) ooo=mergeDeep(ooo,raw.ooo);
 
+    // Merge requests — add any from GitHub that don't exist locally
+    // Local always wins (preserves your approved/denied status)
+    if(raw.requests&&Array.isArray(raw.requests)){
+      const localIds=new Set(requests.map(r=>r.id));
+      const newFromRemote=raw.requests.filter(r=>!localIds.has(r.id));
+      if(newFromRemote.length){
+        requests=[...requests,...newFromRemote];
+        requests.sort((a,b)=>b.submittedAt.localeCompare(a.submittedAt));
+        localStorage.setItem(RQK,JSON.stringify(requests));
+        updateReqBadge();
+      }
+    }
+
     // Cache merged result to localStorage
     localStorage.setItem(SOK,JSON.stringify(schedOverrides));
     localStorage.setItem(FOK,JSON.stringify(friOverrides));
@@ -1212,6 +1226,7 @@ async function pullFromGitHub(){
     localStorage.setItem(PTK,JSON.stringify(noPT));
     localStorage.setItem(HK,JSON.stringify(noHoliday));
     localStorage.setItem(OOK,JSON.stringify(ooo));
+    localStorage.setItem(RQK,JSON.stringify(requests));
     return true;
   }catch(e){return false;}
 }
@@ -3956,10 +3971,24 @@ async function sendSlackNotification(webhookUrl,req){
   }
 }
 
-function saveRequests(){localStorage.setItem(RQK,JSON.stringify(requests));}
+function saveRequests(){
+  localStorage.setItem(RQK,JSON.stringify(requests));
+  // Push to GitHub so manager and agents share the same request list
+  // Debounced — batches rapid saves into one push
+  clearTimeout(saveRequests._timer);
+  saveRequests._timer=setTimeout(()=>{
+    if(ghUser&&ghRepo&&ghToken) pushToGitHub(true);
+  },1500);
+}
 function loadRequests(){
   try{const r=localStorage.getItem(RQK);if(r)requests=JSON.parse(r);}catch(e){}
   updateReqBadge();
+  // Pull from GitHub to get requests submitted by other browsers/agents
+  if(ghUser&&ghRepo){
+    pullFromGitHub().then(ok=>{
+      if(ok){renderReviewList();updateReqBadge();}
+    });
+  }
 }
 
 function updateReqBadge(){
@@ -5075,9 +5104,11 @@ function isToday(day,wo){
 setSS('loading');populateSelects();buildLegend();loadGitHubSettings();load();loadRequests();loadSlackSettings();
 setInterval(()=>{
   renderManager();renderAgent();
-  // Pull latest from GitHub every 60s (only if not mid-save and no token = viewer)
-  if(ghUser&&ghRepo&&!ghToken&&!_ghPullBlocked){
-    pullFromGitHub().then(ok=>{if(ok) renderAll();});
+  // Pull latest from GitHub every 60s
+  if(ghUser&&ghRepo&&!_ghPullBlocked){
+    pullFromGitHub().then(ok=>{
+      if(ok){renderAll();renderReviewList();updateReqBadge();}
+    });
   }
 },60000);
 </script>
