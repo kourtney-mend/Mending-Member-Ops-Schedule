@@ -1415,9 +1415,9 @@
         ]
       ],
       "notes": "",
-      "status": "pending",
+      "status": "denied",
       "submittedAt": "2026-05-21T19:31:21.357Z",
-      "resolvedAt": null,
+      "resolvedAt": "2026-05-21T19:34:06.725Z",
       "managerNote": "",
       "timeAct": null,
       "timeMinutes": 0,
@@ -1499,5 +1499,5 @@
     }
   ],
   "_managerWebhook": "",
-  "_saved": "2026-05-21T19:34:05.590Z"
+  "_saved": "2026-05-21T19:34:08.405Z"
 }
