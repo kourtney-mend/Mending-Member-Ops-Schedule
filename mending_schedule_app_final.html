@@ -1059,10 +1059,11 @@ let indefiniteNoOB=false,indefiniteNoPT=false;
 // ── GitHub sync ───────────────────────────────────────────────
 const GH_KEY='mending-github-v1';
 const GH_FILE='schedule-data.json';
-// Public repo info — anyone can read schedule-data.json from here without a token
-// Token is only needed for writing (manager only, set in GitHub sync settings)
 const GH_PUBLIC_USER='kourtney-mend';
 const GH_PUBLIC_REPO='Mending-Member-Ops-Schedule';
+// Shared write token — lets agents push requests without personal GitHub setup
+// This token only has access to this one repo
+const GH_SHARED_TOKEN='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';
 let ghUser=GH_PUBLIC_USER,ghRepo=GH_PUBLIC_REPO,ghToken='';
 
 function loadGitHubSettings(){
@@ -1112,32 +1113,31 @@ function buildGHPayload(){
 }
 
 async function pushToGitHub(silent=false){
-  if(!ghUser||!ghRepo||!ghToken){
+  // Use personal token if set, otherwise fall back to shared token
+  const token=ghToken||GH_SHARED_TOKEN;
+  if(!ghUser||!ghRepo||!token||token==='PASTE_YOUR_TOKEN_HERE'){
     if(!silent) document.getElementById('gh-status').innerHTML='<span style="color:#A32D2D">✗ Please fill in all GitHub settings first.</span>';
     return false;
   }
-  // Prevent concurrent pushes — if one is already running, skip (debounce handles retry)
   if(pushToGitHub._running){return false;}
   pushToGitHub._running=true;
   const statusEl=document.getElementById('gh-status');
   if(!silent) statusEl.innerHTML='<span style="color:#BA7517">Pushing to GitHub...</span>';
 
   try{
-    // Always fetch fresh SHA immediately before writing to avoid collisions
     let sha='';
     const getResp=await fetch(ghApiUrl(),{
-      headers:{'Authorization':`Bearer ${ghToken}`,'Accept':'application/vnd.github+json'}
+      headers:{'Authorization':`Bearer ${token}`,'Accept':'application/vnd.github+json'}
     });
     if(getResp.ok){const d=await getResp.json();sha=d.sha||'';}
 
-    // Push latest data (captured at push time, not when save() was called)
     const content=btoa(unescape(encodeURIComponent(JSON.stringify(buildGHPayload(),null,2))));
     const body={message:'Schedule update',content};
     if(sha) body.sha=sha;
 
     const putResp=await fetch(ghApiUrl(),{
       method:'PUT',
-      headers:{'Authorization':`Bearer ${ghToken}`,'Accept':'application/vnd.github+json','Content-Type':'application/json'},
+      headers:{'Authorization':`Bearer ${token}`,'Accept':'application/vnd.github+json','Content-Type':'application/json'},
       body:JSON.stringify(body)
     });
     pushToGitHub._running=false;
@@ -3982,9 +3982,10 @@ async function sendSlackNotification(webhookUrl,req){
 
 function saveRequests(){
   localStorage.setItem(RQK,JSON.stringify(requests));
+  // Always push to GitHub — shared token lets agents push too
   clearTimeout(saveRequests._timer);
   saveRequests._timer=setTimeout(()=>{
-    if(ghUser&&ghRepo&&ghToken) pushToGitHub(true);
+    pushToGitHub(true);
   },1500);
 }
 function loadRequests(){
