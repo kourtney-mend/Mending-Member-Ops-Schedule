@@ -235,21 +235,6 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
 
   <!-- REQUEST CHANGE -->
   <div id="view-request" class="view">
-    <!-- GitHub sync for agents -->
-    <div class="card" id="agent-gh-sync-card">
-      <div class="card-title">☁ Connect to GitHub <span style="font-size:12px;font-weight:400;color:var(--text-tertiary)">— required to submit requests</span></div>
-      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:1rem">Enter the GitHub token your manager sent you. Only needs to be done once per device.</p>
-      <div style="margin-bottom:8px">
-        <label>GitHub token</label>
-        <input type="password" id="agent-gh-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-          style="width:100%;font-size:13px;padding:7px 9px;border:0.5px solid var(--border-mid);border-radius:var(--radius-md);background:var(--bg-primary);color:var(--text-primary);font-family:var(--font);margin-top:4px">
-        <div style="font-size:11px;color:var(--text-tertiary);margin-top:4px">Stored in your browser only — never shared anywhere except GitHub.</div>
-      </div>
-      <div class="btn-row">
-        <button class="bp" onclick="saveAgentGHToken()">Save token</button>
-      </div>
-      <div id="agent-gh-status" style="font-size:12px;margin-top:8px"></div>
-    </div>
     <div class="alert-box a-info" style="margin-bottom:1rem">
       <span>Submit a schedule change request. Your manager will review and approve or deny it. Approved changes will update your schedule automatically.</span>
     </div>
@@ -461,7 +446,6 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
       <div style="font-size:13px;color:var(--text-secondary)" id="review-summary"></div>
       <div style="display:flex;gap:8px">
         <button class="bs" onclick="toggleGitHubSettings()" style="font-size:12px">☁ GitHub sync</button>
-        <button class="bs" onclick="toggleSlackSettings()" style="font-size:12px">⚙ Slack settings</button>
         <button class="bs" onclick="reqClearAll()" style="font-size:12px">Clear all resolved</button>
       </div>
     </div>
@@ -495,66 +479,6 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
           <button class="bs" onclick="pushToGitHub()">Push now</button>
         </div>
         <div id="gh-status" style="font-size:12px;margin-top:8px"></div>
-      </div>
-    </div>
-
-    <!-- Slack settings panel -->
-    <div id="slack-settings-panel" style="display:none;margin-bottom:1rem">
-      <div class="card" style="margin-bottom:0">
-        <div class="card-title" style="margin-bottom:.5rem">Slack notification settings</div>
-        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:1rem">
-          Set up webhooks for request notifications and per-agent schedule change DMs. Each agent webhook should point to their personal Slack DM.
-        </p>
-
-        <div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:10px 12px;margin-bottom:12px">
-          <div style="font-size:12px;font-weight:500;color:var(--text-secondary);margin-bottom:8px">Request notifications (your DM or a manager channel)</div>
-          <div style="margin-bottom:8px">
-            <label>Webhook URL</label>
-            <input type="text" id="slack-webhook-url" placeholder="https://hooks.slack.com/services/..."
-              style="width:100%;font-size:13px;padding:7px 9px;border:0.5px solid var(--border-mid);border-radius:var(--radius-md);background:var(--bg-primary);color:var(--text-primary);font-family:var(--font);margin-top:4px">
-          </div>
-          <div>
-            <label>Your name (shown in notifications)</label>
-            <input type="text" id="slack-manager-name" placeholder="e.g. Kourtney"
-              style="width:100%;font-size:13px;padding:7px 9px;border:0.5px solid var(--border-mid);border-radius:var(--radius-md);background:var(--bg-primary);color:var(--text-primary);font-family:var(--font);margin-top:4px">
-          </div>
-        </div>
-
-        <div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:10px 12px;margin-bottom:12px">
-          <div style="font-size:12px;font-weight:500;color:var(--text-secondary);margin-bottom:8px">Schedule change notifications — agent DMs</div>
-          <p style="font-size:12px;color:var(--text-tertiary);margin-bottom:8px">Each agent will be messaged automatically when you save a change to their schedule today. Set up one webhook per person pointing to their Slack DM.</p>
-          <div style="margin-bottom:8px">
-            <label>Ebony's webhook URL</label>
-            <input type="text" id="slack-agent-ebony" placeholder="https://hooks.slack.com/services/..."
-              style="width:100%;font-size:13px;padding:7px 9px;border:0.5px solid var(--border-mid);border-radius:var(--radius-md);background:var(--bg-primary);color:var(--text-primary);font-family:var(--font);margin-top:4px">
-          </div>
-          <div style="margin-bottom:8px">
-            <label>Marisa's webhook URL</label>
-            <input type="text" id="slack-agent-marisa" placeholder="https://hooks.slack.com/services/..."
-              style="width:100%;font-size:13px;padding:7px 9px;border:0.5px solid var(--border-mid);border-radius:var(--radius-md);background:var(--bg-primary);color:var(--text-primary);font-family:var(--font);margin-top:4px">
-          </div>
-          <div style="margin-bottom:8px">
-            <label>Ky's webhook URL</label>
-            <input type="text" id="slack-agent-ky" placeholder="https://hooks.slack.com/services/..."
-              style="width:100%;font-size:13px;padding:7px 9px;border:0.5px solid var(--border-mid);border-radius:var(--radius-md);background:var(--bg-primary);color:var(--text-primary);font-family:var(--font);margin-top:4px">
-          </div>
-        </div>
-
-        <div class="btn-row">
-          <button class="bp" onclick="saveSlackSettings()">Save all</button>
-          <button class="bs" onclick="testSlackNotification()">Test request webhook</button>
-        </div>
-        <div id="slack-status" style="font-size:12px;margin-top:8px"></div>
-
-        <div style="margin-top:1rem;padding-top:1rem;border-top:0.5px solid var(--border-light)">
-          <div style="font-size:12px;font-weight:500;color:var(--text-secondary);margin-bottom:6px">How to get a webhook URL (repeat for each person):</div>
-          <ol style="font-size:12px;color:var(--text-tertiary);padding-left:1.25rem;line-height:1.8">
-            <li>Go to <strong>api.slack.com/apps</strong> and open your existing app (or create a new one)</li>
-            <li>Click "Incoming Webhooks" → "Add New Webhook to Workspace"</li>
-            <li>Search for the person's name to send to their DM, or pick a channel</li>
-            <li>Copy the webhook URL and paste it in the field above</li>
-          </ol>
-        </div>
       </div>
     </div>
 
@@ -2346,32 +2270,6 @@ function updateNoOBWeekBtn(){
   }
 }
 function setMDay(d){mDay=d;renderManager();}
-function saveAgentGHToken(){
-  const token=document.getElementById('agent-gh-token').value.trim();
-  if(!token){alert('Please enter your token.');return;}
-  if(!token.startsWith('ghp_')){alert('Token should start with ghp_ — check that you copied it correctly.');return;}
-  // Save using the same GitHub settings storage
-  ghToken=token;
-  localStorage.setItem(GH_KEY,JSON.stringify({user:ghUser,repo:ghRepo,token:ghToken}));
-  document.getElementById('agent-gh-status').innerHTML='<span style="color:#27500A">✓ Token saved! Your requests will now sync to the team schedule.</span>';
-  document.getElementById('agent-gh-token').value='';
-  // Hide the card after saving
-  setTimeout(()=>{
-    const card=document.getElementById('agent-gh-sync-card');
-    if(card) card.style.display='none';
-  },2000);
-}
-
-function initAgentGHCard(){
-  // Hide the GitHub card if token is already saved
-  const card=document.getElementById('agent-gh-sync-card');
-  if(!card) return;
-  if(ghToken){
-    card.style.display='none';
-  } else {
-    card.style.display='block';
-  }
-}
 function setMgrFriWeek(w){mFW=w;renderManager();updateNoOBWeekBtn();}
 function navWeek(dir){weekOffset+=dir;renderAll();updateNoOBWeekBtn();}
 
@@ -3853,46 +3751,6 @@ function loadSlackSettings(){
   }catch(e){}
 }
 
-function saveSlackSettings(){
-  slackWebhook=document.getElementById('slack-webhook-url').value.trim();
-  slackManagerName=document.getElementById('slack-manager-name').value.trim();
-  slackAgentWebhooks={
-    Ebony:document.getElementById('slack-agent-ebony').value.trim(),
-    Marisa:document.getElementById('slack-agent-marisa').value.trim(),
-    Ky:document.getElementById('slack-agent-ky').value.trim(),
-  };
-  localStorage.setItem(SLACK_KEY,JSON.stringify({webhook:slackWebhook,name:slackManagerName,agents:slackAgentWebhooks}));
-  document.getElementById('slack-status').innerHTML='<span style="color:#27500A">✓ Settings saved</span>';
-}
-
-function toggleSlackSettings(){
-  const panel=document.getElementById('slack-settings-panel');
-  const isOpen=panel.style.display!=='none';
-  panel.style.display=isOpen?'none':'block';
-  if(!isOpen){
-    document.getElementById('slack-webhook-url').value=slackWebhook;
-    document.getElementById('slack-manager-name').value=slackManagerName;
-    document.getElementById('slack-agent-ebony').value=slackAgentWebhooks.Ebony||'';
-    document.getElementById('slack-agent-marisa').value=slackAgentWebhooks.Marisa||'';
-    document.getElementById('slack-agent-ky').value=slackAgentWebhooks.Ky||'';
-    document.getElementById('slack-status').textContent='';
-  }
-}
-
-function testSlackNotification(){
-  const url=document.getElementById('slack-webhook-url').value.trim();
-  if(!url){alert('Please enter a webhook URL first.');return;}
-  const statusEl=document.getElementById('slack-status');
-  statusEl.innerHTML='<span style="color:#BA7517">Sending...</span>';
-  sendSlackNotification(url,{
-    _raw:':white_check_mark: *Test from Mending Schedule App* — your webhook is connected!'
-  }).then(ok=>{
-    statusEl.innerHTML=ok
-      ?'<span style="color:#27500A">✓ Request sent — check your Slack to confirm it arrived. (Browser security prevents us from reading Slack\'s response directly.)</span>'
-      :'<span style="color:#A32D2D">✗ Failed to send. Check your webhook URL.</span>';
-  });
-}
-
 // Send a schedule change DM to an agent when their schedule is updated today
 function notifyAgentScheduleChange(agent,dateStr,blocks){
   loadSlackSettings();
@@ -5117,7 +4975,6 @@ function switchTab(tab){
     onReqTypeChange();
     const agent=document.getElementById('req-agent').value;
     renderMyRequests(agent);
-    initAgentGHCard();
   }
   if(tab==='review') renderReviewList();
 }
