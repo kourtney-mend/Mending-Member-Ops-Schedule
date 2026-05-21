@@ -4336,11 +4336,12 @@ function renderReviewList(){
         <div>Requested start: <strong>${m2d(t2m(r.shiftNewStart))} ${tz}</strong></div>
         <div>Requested end: <strong>${m2d(t2m(r.shiftNewEnd))} ${tz}</strong></div>
         <div style="font-size:11px;color:var(--text-tertiary);margin-top:4px">Entire schedule will be shifted to match — activities and durations unchanged</div>
+        ${r.notes?`<div style="margin-top:6px;font-style:italic;color:var(--text-secondary)">"${r.notes}"</div>`:''}
       </div>`;
       if(r.status==='pending'){
         actionHTML=`<div style="margin-bottom:8px"><input type="text" placeholder="Optional note to agent..." id="mgr-note-${r.id}" style="width:100%;font-size:12px;padding:6px 9px;border:0.5px solid var(--border-mid);border-radius:var(--radius-md);background:var(--bg-primary);color:var(--text-primary);font-family:var(--font)"></div>
           <div class="btn-row">
-            <button class="bp" onclick="resolveRequest('${r.id}','approved')" style="background:#27500A;border-color:#27500A">✓ Approve shift</button>
+            <button class="bp" onclick="resolveRequest('${r.id}','approved')" style="background:#27500A;border-color:#27500A">✓ Approve</button>
             <button class="bd" onclick="resolveRequest('${r.id}','denied')">✗ Deny</button>
           </div>`;
       } else {
@@ -4422,8 +4423,8 @@ function renderReviewList(){
     } else {
       detailHTML=`${r.blocks.length?`<div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:8px 10px;margin-bottom:8px">
         <div style="font-size:11px;font-weight:500;color:var(--text-tertiary);margin-bottom:4px">PROPOSED BLOCKS</div>
-        ${r.blocks.map(b=>{const c=COLORS[b[0]]||{bg:'#D3D1C7',text:'#444441'};return`<div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:3px"><div style="width:8px;height:8px;border-radius:2px;background:${c.bg}"></div><strong>${b[0]}</strong> <span style="color:var(--text-tertiary)">${m2d(t2m(b[1]))}–${m2d(t2m(b[2]))} ${tz}</span></div>`;}).join('')}
-      </div>`:''}${r.notes?`<div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;font-style:italic">"${r.notes}"</div>`:''}`;
+        ${r.blocks.map(b=>{const c=COLORS[b[0]]||{bg:'#D3D1C7',text:'#444441'};return`<div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:4px"><div style="width:8px;height:8px;border-radius:2px;background:${c.bg};flex-shrink:0"></div><strong>${b[0]}</strong> <span style="color:var(--text-secondary)">${m2d(t2m(b[1]))}–${m2d(t2m(b[2]))} <span style="color:#185FA5">${tz}</span></span> <span style="color:var(--text-tertiary);font-size:11px">(${t2m(b[2])-t2m(b[1])}m)</span></div>`;}).join('')}
+      </div>`:''}${r.notes?`<div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;padding:8px 10px;background:var(--bg-secondary);border-radius:var(--radius-md);font-style:italic">"${r.notes}"</div>`:''}`;
       if(r.status==='pending'){
         actionHTML=`<div style="margin-bottom:8px"><input type="text" placeholder="Optional note to agent..." id="mgr-note-${r.id}" style="width:100%;font-size:12px;padding:6px 9px;border:0.5px solid var(--border-mid);border-radius:var(--radius-md);background:var(--bg-primary);color:var(--text-primary);font-family:var(--font)"></div>
         <div class="btn-row">
@@ -4438,7 +4439,10 @@ function renderReviewList(){
     return`<div style="border:0.5px solid var(--border-light);border-radius:var(--radius-lg);padding:14px;margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;flex-wrap:wrap;gap:6px">
         <div><span style="font-size:14px;font-weight:500">${r.agent}</span> <span style="font-size:12px;color:var(--text-tertiary);margin-left:6px">${typeLabel}</span></div>
-        <span style="font-size:11px;padding:2px 9px;border-radius:20px;font-weight:500;background:${statusBg};color:${statusColor}">${r.status}</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:11px;padding:2px 9px;border-radius:20px;font-weight:500;background:${statusBg};color:${statusColor}">${r.status}</span>
+          <button onclick="deleteRequest('${r.id}')" style="font-size:11px;padding:2px 8px;border-radius:20px;cursor:pointer;font-family:var(--font);border:0.5px solid #E8A0A0;background:#FCEBEB;color:#A32D2D">✕ Delete</button>
+        </div>
       </div>
       <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">📅 ${dateDisp} <span style="color:var(--text-tertiary);font-size:11px">· submitted ${subDate}</span></div>
       ${detailHTML}${actionHTML}
@@ -4698,6 +4702,14 @@ function _finalizeResolveRequest(req,dayName,fw,previewBlocks){
 
   saveRequests();updateReqBadge();renderReviewList();renderAll();
   notifyAgentRequestResolved(req,'approved');
+}
+
+function deleteRequest(id){
+  if(!confirm('Delete this request? This cannot be undone.')) return;
+  requests=requests.filter(r=>r.id!==id);
+  saveRequests();
+  updateReqBadge();
+  renderReviewList();
 }
 
 function reqClearAll(){
