@@ -272,7 +272,7 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
 
       <!-- Standard: Proposed schedule blocks -->
       <div id="req-blocks-panel" style="margin-bottom:1rem">
-        <label style="margin-bottom:6px;display:block">Proposed changes <span style="font-weight:400;color:var(--text-tertiary)">(describe what you'd like moved or added)</span></label>
+        <label style="margin-bottom:6px;display:block">Proposed changes <span style="color:#A32D2D;font-weight:500">*required</span> <span style="font-weight:400;color:var(--text-tertiary)">— add the activity, start time, and end time below</span></label>
         <div id="req-blocks-list" style="display:flex;flex-direction:column;gap:5px;margin-bottom:8px"></div>
         <div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:10px 12px">
           <div style="font-size:12px;font-weight:500;color:var(--text-secondary);margin-bottom:8px">Add a proposed block</div>
@@ -4230,7 +4230,7 @@ function submitRequest(){
     }
     // Falls outside Shadowing — goes to manager review as normal
   } else {
-    if(reqBlocks.length===0&&!notes){alert('Please add at least one proposed block or a note.');return;}
+    if(reqBlocks.length===0){alert('Please add at least one proposed block with the activity, start time, and end time before submitting.');return;}
   }
 
   const req={
@@ -4421,10 +4421,39 @@ function renderReviewList(){
       actionHTML=`<div style="margin-bottom:8px"><input type="text" placeholder="Overall note to agent..." id="mgr-note-${r.id}" style="width:100%;font-size:12px;padding:6px 9px;border:0.5px solid var(--border-mid);border-radius:var(--radius-md);background:var(--bg-primary);color:var(--text-primary);font-family:var(--font)"></div>
         <div class="btn-row"><button class="bd" onclick="resolveRequest('${r.id}','denied')">✗ Deny all</button></div>`;
     } else {
-      detailHTML=`${r.blocks.length?`<div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:8px 10px;margin-bottom:8px">
-        <div style="font-size:11px;font-weight:500;color:var(--text-tertiary);margin-bottom:4px">PROPOSED BLOCKS</div>
-        ${r.blocks.map(b=>{const c=COLORS[b[0]]||{bg:'#D3D1C7',text:'#444441'};return`<div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:4px"><div style="width:8px;height:8px;border-radius:2px;background:${c.bg};flex-shrink:0"></div><strong>${b[0]}</strong> <span style="color:var(--text-secondary)">${m2d(t2m(b[1]))}–${m2d(t2m(b[2]))} <span style="color:#185FA5">${tz}</span></span> <span style="color:var(--text-tertiary);font-size:11px">(${t2m(b[2])-t2m(b[1])}m)</span></div>`;}).join('')}
-      </div>`:''}${r.notes?`<div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;padding:8px 10px;background:var(--bg-secondary);border-radius:var(--radius-md);font-style:italic">"${r.notes}"</div>`:''}`;
+      // Always show current schedule for context + coverage preview
+      const d=new Date(r.date+'T12:00:00');
+      const dayName=d.toLocaleDateString('en-US',{weekday:'long'});
+      const savedWO=weekOffset;
+      for(let wo=-52;wo<=52;wo++){if(toISO(dateOfDay(dayName,wo))===r.date){weekOffset=wo;break;}}
+      const fw=dayName==='Friday'?getFriWeekForDate(d):1;
+      const existing=getRawBlocks(r.agent,dayName,fw,r.date);
+      weekOffset=savedWO;
+
+      // Current schedule
+      const currentSchedHTML=existing.length?`<div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:8px 10px;margin-bottom:8px">
+        <div style="font-size:11px;font-weight:500;color:var(--text-tertiary);margin-bottom:4px">CURRENT SCHEDULE — ${r.agent} · ${dayName} · ${ATZ[r.agent]}</div>
+        ${existing.map(b=>{const c=COLORS[b[0]]||{bg:'#D3D1C7',text:'#444441'};const dur=t2m(b[2])-t2m(b[1]);return`<div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:3px"><div style="width:8px;height:8px;border-radius:2px;flex-shrink:0;background:${c.bg}"></div><strong>${b[0]}</strong> <span style="color:var(--text-secondary)">${m2d(t2m(b[1]))}–${m2d(t2m(b[2]))} <span style="color:#185FA5">${ATZ[r.agent]}</span></span> <span style="color:var(--text-tertiary);font-size:11px">(${dur}m)</span></div>`;}).join('')}
+      </div>`:'';
+
+      // Proposed blocks (if any)
+      let proposedHTML='';
+      let covPreviewHTML='';
+      if(r.blocks.length){
+        proposedHTML=`<div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:8px 10px;margin-bottom:8px">
+          <div style="font-size:11px;font-weight:500;color:var(--text-tertiary);margin-bottom:4px">PROPOSED BLOCKS</div>
+          ${r.blocks.map(b=>{const c=COLORS[b[0]]||{bg:'#D3D1C7',text:'#444441'};return`<div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:4px"><div style="width:8px;height:8px;border-radius:2px;background:${c.bg};flex-shrink:0"></div><strong>${b[0]}</strong> <span style="color:var(--text-secondary)">${m2d(t2m(b[1]))}–${m2d(t2m(b[2]))} <span style="color:#185FA5">${tz}</span></span> <span style="color:var(--text-tertiary);font-size:11px">(${t2m(b[2])-t2m(b[1])}m)</span></div>`;}).join('')}
+        </div>`;
+        const merged=mergeBlocksIntoSchedule(existing,r.blocks);
+        covPreviewHTML=`<div style="margin-bottom:8px"><div style="font-size:11px;font-weight:500;color:var(--text-tertiary);margin-bottom:4px">COVERAGE IMPACT</div>${bamCovHTML(dayName,fw,r.agent,merged)}</div>`;
+      } else {
+        // No proposed blocks — show current coverage for context
+        covPreviewHTML=`<div style="margin-bottom:8px"><div style="font-size:11px;font-weight:500;color:var(--text-tertiary);margin-bottom:4px">CURRENT COVERAGE</div>${bamCovHTML(dayName,fw,r.agent,existing)}</div>`;
+      }
+
+      const notesHTML=r.notes?`<div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;padding:8px 10px;background:var(--bg-secondary);border-radius:var(--radius-md);font-style:italic">"${r.notes}"</div>`:'';
+      detailHTML=notesHTML+currentSchedHTML+proposedHTML+covPreviewHTML;
+
       if(r.status==='pending'){
         actionHTML=`<div style="margin-bottom:8px"><input type="text" placeholder="Optional note to agent..." id="mgr-note-${r.id}" style="width:100%;font-size:12px;padding:6px 9px;border:0.5px solid var(--border-mid);border-radius:var(--radius-md);background:var(--bg-primary);color:var(--text-primary);font-family:var(--font)"></div>
         <div class="btn-row">
