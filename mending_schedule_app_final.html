@@ -3888,7 +3888,12 @@ async function sendSlackNotification(webhookUrl,req){
 function saveRequests(){
   localStorage.setItem(RQK,JSON.stringify(requests));
   clearTimeout(saveRequests._timer);
-  saveRequests._timer=setTimeout(()=>pushRequestsToGitHub(),1500);
+  saveRequests._timer=setTimeout(()=>{
+    // Use full save() if manager token available — more reliable
+    // Fall back to pushRequestsToGitHub for agents
+    if(ghToken) save();
+    else pushRequestsToGitHub();
+  },1500);
 }
 
 async function pushRequestsToGitHub(){
