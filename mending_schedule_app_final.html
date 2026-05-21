@@ -3981,11 +3981,14 @@ async function sendSlackNotification(webhookUrl,req){
 
 function saveRequests(){
   localStorage.setItem(RQK,JSON.stringify(requests));
-  // Push to GitHub so manager and agents share the same request list
-  // Debounced — batches rapid saves into one push
   clearTimeout(saveRequests._timer);
-  saveRequests._timer=setTimeout(()=>{
-    if(ghUser&&ghRepo&&ghToken) pushToGitHub(true);
+  saveRequests._timer=setTimeout(async()=>{
+    if(ghUser&&ghRepo&&ghToken){
+      const ok=await pushToGitHub(true);
+      console.log('saveRequests GitHub push:',ok?'✓ success':'✗ failed','token present:',!!ghToken,'requests count:',requests.length);
+    } else {
+      console.warn('saveRequests: no GitHub push — user:',ghUser,'repo:',ghRepo,'token:',!!ghToken);
+    }
   },1500);
 }
 function loadRequests(){
@@ -4318,14 +4321,29 @@ function submitRequest(){
   saveRequests();updateReqBadge();reqClear();
   elMakeupDays=[];renderElMakeupDays();
 
-  // Get best available webhook — local settings first, then webhook from GitHub data
+  // Diagnostic — show exactly what's happening with Slack and GitHub
+  const diagEl=document.getElementById('req-status');
+
+  // Get best available webhook
   loadSlackSettings();
   const webhookToUse=slackWebhook||remoteManagerWebhook||
     (()=>{try{const s=localStorage.getItem(SLACK_KEY);if(s){const d=JSON.parse(s);return d.webhook||'';}return'';}catch(e){return'';}})();
 
+  const hasToken=!!(ghToken);
+  const hasWebhook=!!(webhookToUse);
+  const dateDisp=new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+
+  diagEl.innerHTML=`<span style="color:#27500A">✓ Request submitted for ${dateDisp}.</span>
+    <div style="margin-top:6px;font-size:11px;color:var(--text-tertiary);font-family:monospace;background:var(--bg-secondary);padding:6px 8px;border-radius:4px">
+      Slack webhook: ${hasWebhook?'✓ found ('+webhookToUse.slice(0,40)+'...)':'✗ MISSING'}
+      <br>GitHub token: ${hasToken?'✓ found':'✗ MISSING — request will not sync to manager'}
+      <br>remoteWebhook: ${remoteManagerWebhook?'✓ ('+remoteManagerWebhook.slice(0,30)+'...)':'✗ empty'}
+      <br>slackWebhook var: ${slackWebhook?'✓':'✗ empty'}
+    </div>`;
+
   if(webhookToUse){
     sendSlackNotification(webhookToUse,req).then(ok=>{
-      if(!ok) console.warn('Slack notification failed for request',req.id);
+      diagEl.innerHTML+=`<div style="font-size:11px;font-family:monospace;color:${ok?'#27500A':'#A32D2D'}">Slack send: ${ok?'✓ sent':'✗ failed'}</div>`;
     });
   }
   const dateDisp=new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
