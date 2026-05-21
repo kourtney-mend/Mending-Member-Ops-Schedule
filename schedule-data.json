@@ -946,6 +946,68 @@
           "16:30",
           "17:00"
         ]
+      ],
+      "2026-05-21": [
+        [
+          "On Phones",
+          "09:00",
+          "09:30"
+        ],
+        [
+          "Ticket Time",
+          "09:30",
+          "10:00"
+        ],
+        [
+          "1:1",
+          "10:00",
+          "10:30"
+        ],
+        [
+          "On Phones",
+          "10:30",
+          "11:30"
+        ],
+        [
+          "Lunch",
+          "11:30",
+          "12:00"
+        ],
+        [
+          "Break 1",
+          "12:00",
+          "12:15"
+        ],
+        [
+          "On Phones",
+          "12:15",
+          "12:30"
+        ],
+        [
+          "1:1",
+          "12:30",
+          "13:00"
+        ],
+        [
+          "On Phones",
+          "13:00",
+          "15:00"
+        ],
+        [
+          "Break 2",
+          "15:00",
+          "15:15"
+        ],
+        [
+          "Outbound",
+          "15:15",
+          "16:15"
+        ],
+        [
+          "On Phones",
+          "16:15",
+          "17:00"
+        ]
       ]
     }
   },
@@ -1340,70 +1402,6 @@
   },
   "requests": [
     {
-      "id": "req-1779377140821",
-      "agent": "Ky",
-      "type": "day",
-      "date": "2026-05-21",
-      "dayOfWeek": "Monday",
-      "blocks": [
-        [
-          "1:1",
-          "10:00",
-          "10:30"
-        ]
-      ],
-      "notes": "",
-      "status": "pending",
-      "submittedAt": "2026-05-21T15:25:40.821Z",
-      "resolvedAt": null,
-      "managerNote": "",
-      "timeAct": null,
-      "timeMinutes": 0,
-      "timeFreq": "once",
-      "approvedMinutes": null,
-      "elLeaveTime": null,
-      "elHours": 0,
-      "elActivity": null,
-      "elMakeup": [],
-      "elMakeupStatus": {},
-      "shiftNewStart": null,
-      "shiftNewEnd": null,
-      "shadowtoStart": null,
-      "shadowtoEnd": null
-    },
-    {
-      "id": "req-1779378208080",
-      "agent": "Ky",
-      "type": "day",
-      "date": "2026-05-21",
-      "dayOfWeek": "Monday",
-      "blocks": [
-        [
-          "1:1",
-          "10:00",
-          "10:30"
-        ]
-      ],
-      "notes": "",
-      "status": "pending",
-      "submittedAt": "2026-05-21T15:43:28.080Z",
-      "resolvedAt": null,
-      "managerNote": "",
-      "timeAct": null,
-      "timeMinutes": 0,
-      "timeFreq": "once",
-      "approvedMinutes": null,
-      "elLeaveTime": null,
-      "elHours": 0,
-      "elActivity": null,
-      "elMakeup": [],
-      "elMakeupStatus": {},
-      "shiftNewStart": null,
-      "shiftNewEnd": null,
-      "shadowtoStart": null,
-      "shadowtoEnd": null
-    },
-    {
       "id": "req-1779391881357",
       "agent": "Ky",
       "type": "day",
@@ -1434,8 +1432,72 @@
       "shiftNewEnd": null,
       "shadowtoStart": null,
       "shadowtoEnd": null
+    },
+    {
+      "id": "req-1779378208080",
+      "agent": "Ky",
+      "type": "day",
+      "date": "2026-05-21",
+      "dayOfWeek": "Monday",
+      "blocks": [
+        [
+          "1:1",
+          "10:00",
+          "10:30"
+        ]
+      ],
+      "notes": "",
+      "status": "approved",
+      "submittedAt": "2026-05-21T15:43:28.080Z",
+      "resolvedAt": "2026-05-21T19:34:03.672Z",
+      "managerNote": "",
+      "timeAct": null,
+      "timeMinutes": 0,
+      "timeFreq": "once",
+      "approvedMinutes": null,
+      "elLeaveTime": null,
+      "elHours": 0,
+      "elActivity": null,
+      "elMakeup": [],
+      "elMakeupStatus": {},
+      "shiftNewStart": null,
+      "shiftNewEnd": null,
+      "shadowtoStart": null,
+      "shadowtoEnd": null
+    },
+    {
+      "id": "req-1779377140821",
+      "agent": "Ky",
+      "type": "day",
+      "date": "2026-05-21",
+      "dayOfWeek": "Monday",
+      "blocks": [
+        [
+          "1:1",
+          "10:00",
+          "10:30"
+        ]
+      ],
+      "notes": "",
+      "status": "pending",
+      "submittedAt": "2026-05-21T15:25:40.821Z",
+      "resolvedAt": null,
+      "managerNote": "",
+      "timeAct": null,
+      "timeMinutes": 0,
+      "timeFreq": "once",
+      "approvedMinutes": null,
+      "elLeaveTime": null,
+      "elHours": 0,
+      "elActivity": null,
+      "elMakeup": [],
+      "elMakeupStatus": {},
+      "shiftNewStart": null,
+      "shiftNewEnd": null,
+      "shadowtoStart": null,
+      "shadowtoEnd": null
     }
   ],
   "_managerWebhook": "",
-  "_saved": "2026-05-21T19:31:23.415Z"
+  "_saved": "2026-05-21T19:34:05.590Z"
 }
