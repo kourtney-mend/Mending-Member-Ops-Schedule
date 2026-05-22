@@ -1175,10 +1175,14 @@ async function _doPullFromGitHub(){
     if(raw._managerWebhook) remoteManagerWebhook=raw._managerWebhook;
 
     // Merge requests — add any from GitHub that don't exist locally
-    // Local always wins (preserves your approved/denied status)
+    // Skip if remote request was submitted before our last clear
     if(raw.requests&&Array.isArray(raw.requests)){
       const localIds=new Set(requests.map(r=>r.id));
-      const newFromRemote=raw.requests.filter(r=>!localIds.has(r.id));
+      const lastCleared=localStorage.getItem('mending-requests-cleared')||'';
+      const newFromRemote=raw.requests.filter(r=>
+        !localIds.has(r.id)&&
+        (!lastCleared||r.submittedAt>lastCleared)
+      );
       if(newFromRemote.length){
         requests=[...requests,...newFromRemote];
         requests.sort((a,b)=>b.submittedAt.localeCompare(a.submittedAt));
@@ -4925,7 +4929,9 @@ function _finalizeResolveRequest(req,dayName,fw,previewBlocks){
 function deleteRequest(id){
   if(!confirm('Delete this request? This cannot be undone.')) return;
   requests=requests.filter(r=>r.id!==id);
-  saveRequests();
+  localStorage.setItem(RQK,JSON.stringify(requests));
+  localStorage.setItem('mending-requests-cleared',new Date().toISOString());
+  pushToGitHub(true);
   updateReqBadge();
   renderReviewList();
 }
@@ -4933,7 +4939,9 @@ function deleteRequest(id){
 function reqClearAll(){
   if(!confirm('Remove all approved/denied requests? Pending requests will stay.'))return;
   requests=requests.filter(r=>r.status==='pending');
-  saveRequests();
+  localStorage.setItem(RQK,JSON.stringify(requests));
+  localStorage.setItem('mending-requests-cleared',new Date().toISOString());
+  pushToGitHub(true);
   updateReqBadge();
   renderReviewList();
 }
@@ -4941,7 +4949,9 @@ function reqClearAll(){
 function reqClearEverything(){
   if(!confirm('Delete ALL requests including pending? This cannot be undone.'))return;
   requests=[];
-  saveRequests();
+  localStorage.setItem(RQK,JSON.stringify(requests));
+  localStorage.setItem('mending-requests-cleared',new Date().toISOString());
+  pushToGitHub(true).then(()=>{updateReqBadge();renderReviewList();});
   updateReqBadge();
   renderReviewList();
 }
