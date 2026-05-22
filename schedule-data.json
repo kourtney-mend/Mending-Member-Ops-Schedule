@@ -1220,7 +1220,65 @@
     },
     "2": {
       "Ebony": {},
-      "Marisa": {},
+      "Marisa": {
+        "2026-05-22": [
+          [
+            "Ticket Time",
+            "08:30",
+            "09:00"
+          ],
+          [
+            "On Phones",
+            "09:00",
+            "10:15"
+          ],
+          [
+            "Break 1",
+            "10:15",
+            "10:30"
+          ],
+          [
+            "On Phones",
+            "10:30",
+            "13:15"
+          ],
+          [
+            "Break 2",
+            "13:15",
+            "13:30"
+          ],
+          [
+            "On Phones",
+            "13:30",
+            "14:00"
+          ],
+          [
+            "Weekly Sync",
+            "14:00",
+            "14:30"
+          ],
+          [
+            "On Phones",
+            "14:30",
+            "14:45"
+          ],
+          [
+            "Lunch",
+            "14:45",
+            "15:15"
+          ],
+          [
+            "On Phones",
+            "15:15",
+            "16:00"
+          ],
+          [
+            "Ticket Time",
+            "16:00",
+            "16:30"
+          ]
+        ]
+      },
       "Ky": {}
     },
     "3": {
@@ -1522,6 +1580,38 @@
       "status": "approved",
       "submittedAt": "2026-05-21T19:50:38.777Z",
       "resolvedAt": "2026-05-21T19:50:56.672Z",
+      "managerNote": "",
+      "timeAct": null,
+      "timeMinutes": 0,
+      "timeFreq": "once",
+      "approvedMinutes": null,
+      "elLeaveTime": null,
+      "elHours": 0,
+      "elActivity": null,
+      "elMakeup": [],
+      "elMakeupStatus": {},
+      "shiftNewStart": null,
+      "shiftNewEnd": null,
+      "shadowtoStart": null,
+      "shadowtoEnd": null
+    },
+    {
+      "id": "req-1779391881357",
+      "agent": "Ky",
+      "type": "day",
+      "date": "2026-05-21",
+      "dayOfWeek": "Monday",
+      "blocks": [
+        [
+          "1:1",
+          "10:00",
+          "22:30"
+        ]
+      ],
+      "notes": "",
+      "status": "denied",
+      "submittedAt": "2026-05-21T19:31:21.357Z",
+      "resolvedAt": "2026-05-21T19:34:06.725Z",
       "managerNote": "",
       "timeAct": null,
       "timeMinutes": 0,
@@ -1863,5 +1953,5 @@
     }
   ],
   "_managerWebhook": "",
-  "_saved": "2026-05-22T14:16:43.142Z"
+  "_saved": "2026-05-22T16:18:20.625Z"
 }
