@@ -1530,7 +1530,11 @@
       "Ebony": false
     }
   },
-  "noHoliday": {},
+  "noHoliday": {
+    "2026-05-25": {
+      "Ebony": false
+    }
+  },
   "ooo": {
     "Ebony": {
       "2026-05-01": true,
@@ -2049,5 +2053,5 @@
     }
   ],
   "_managerWebhook": "",
-  "_saved": "2026-05-22T16:19:05.596Z"
+  "_saved": "2026-05-22T16:19:17.202Z"
 }
