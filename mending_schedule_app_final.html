@@ -2297,15 +2297,17 @@ function updateNoOBWeekBtn(){
 function toggleCompanyHoliday(){
   if(!managerUnlocked){requirePIN('manager',()=>toggleCompanyHoliday());return;}
   const dateStr=toISO(dateOfDay(mDay,weekOffset));
-  // Check if all agents already on holiday for this day
-  const allOn=AGENTS.every(a=>noHoliday[dateStr]&&noHoliday[dateStr][a]);
-  if(!noHoliday[dateStr]) noHoliday[dateStr]={};
+  // Check if all agents already OOO for this day
+  const allOn=AGENTS.every(a=>ooo[a]&&ooo[a][dateStr]===true);
   if(allOn){
-    // Turn off — all back to working
-    AGENTS.forEach(a=>{noHoliday[dateStr][a]=false;});
+    // Turn off — restore all agents
+    AGENTS.forEach(a=>{if(ooo[a]) ooo[a][dateStr]=false;});
   } else {
-    // Turn on — all agents holiday
-    AGENTS.forEach(a=>{noHoliday[dateStr][a]=true;});
+    // Mark all agents OOO — company is closed
+    AGENTS.forEach(a=>{
+      if(!ooo[a]) ooo[a]={};
+      ooo[a][dateStr]=true;
+    });
   }
   save();renderAll();
 }
@@ -2314,7 +2316,7 @@ function updateCompanyHolidayBtn(){
   const btn=document.getElementById('company-holiday-btn');
   if(!btn) return;
   const dateStr=toISO(dateOfDay(mDay,weekOffset));
-  const allOn=AGENTS.every(a=>noHoliday[dateStr]&&noHoliday[dateStr][a]);
+  const allOn=AGENTS.every(a=>ooo[a]&&ooo[a][dateStr]===true);
   if(allOn){
     btn.textContent='✓ Holiday — click to restore';
     btn.style.background='#F4C0D1';
