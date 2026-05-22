@@ -169,6 +169,7 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <button onclick="openNoOBModal()" id="no-ob-week-btn" style="font-size:12px;padding:4px 12px;border:0.5px solid var(--border-light);border-radius:var(--radius-md);background:transparent;cursor:pointer;color:var(--text-secondary);font-family:var(--font)">📵 No OB</button>
         <button onclick="openNoPTModal()" id="no-pt-week-btn" style="font-size:12px;padding:4px 12px;border:0.5px solid var(--border-light);border-radius:var(--radius-md);background:transparent;cursor:pointer;color:var(--text-secondary);font-family:var(--font)">⏸ No PT</button>
+        <button onclick="toggleCompanyHoliday()" id="company-holiday-btn" style="font-size:12px;padding:4px 12px;border:0.5px solid var(--border-light);border-radius:var(--radius-md);background:transparent;cursor:pointer;color:var(--text-secondary);font-family:var(--font)">🎉 Company Holiday</button>
         <button onclick="sendTodaySchedules()" id="send-schedules-btn" style="font-size:12px;padding:4px 12px;border:0.5px solid var(--border-light);border-radius:var(--radius-md);background:transparent;cursor:pointer;color:var(--text-secondary);font-family:var(--font)">📅 Send today's schedules</button>
         <span id="send-schedules-status" style="font-size:11px;color:var(--text-tertiary)"></span>
       </div>
@@ -272,16 +273,19 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
 
       <!-- Standard: Proposed schedule blocks -->
       <div id="req-blocks-panel" style="margin-bottom:1rem">
-        <label style="margin-bottom:6px;display:block">Proposed changes <span style="color:#A32D2D;font-weight:500">*required</span> <span style="font-weight:400;color:var(--text-tertiary)">— add the activity, start time, and end time below</span></label>
+        <label style="margin-bottom:6px;display:block">Requested change <span style="color:#A32D2D;font-weight:500">*required</span> <span style="font-weight:400;color:var(--text-tertiary)">— select the activity and times, then confirm</span></label>
         <div id="req-blocks-list" style="display:flex;flex-direction:column;gap:5px;margin-bottom:8px"></div>
         <div style="background:var(--bg-secondary);border-radius:var(--radius-md);padding:10px 12px">
-          <div style="font-size:12px;font-weight:500;color:var(--text-secondary);margin-bottom:8px">Add a proposed block</div>
+          <div style="font-size:12px;font-weight:500;color:var(--text-secondary);margin-bottom:8px">What would you like to change?</div>
           <div class="form-row three">
             <div><label>Activity</label><select id="req-act"></select></div>
             <div><label>Start time</label><input type="time" id="req-start"></div>
             <div><label>End time</label><input type="time" id="req-end"></div>
           </div>
-          <button class="bs" onclick="reqAddBlock()" style="margin-top:4px">+ Add</button>
+          <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+            <button class="bp" onclick="reqConfirmBlock()" id="req-confirm-btn" style="font-size:13px">✓ Confirm requested time</button>
+            <span id="req-confirm-status" style="font-size:12px;color:var(--text-tertiary)"></span>
+          </div>
         </div>
       </div>
 
@@ -446,7 +450,8 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
       <div style="font-size:13px;color:var(--text-secondary)" id="review-summary"></div>
       <div style="display:flex;gap:8px">
         <button class="bs" onclick="toggleGitHubSettings()" style="font-size:12px">☁ GitHub sync</button>
-        <button class="bs" onclick="reqClearAll()" style="font-size:12px">Clear all resolved</button>
+        <button class="bs" onclick="reqClearAll()" style="font-size:12px">Clear resolved</button>
+        <button class="bd" onclick="reqClearEverything()" style="font-size:12px">🗑 Clear all requests</button>
       </div>
     </div>
 
@@ -673,7 +678,27 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
       <div id="bam-add-cov-preview" style="margin-bottom:12px"></div>
       <div class="btn-row">
         <button class="bp" onclick="bamSaveAdd()">Add block</button>
+        <button class="bs" onclick="bamShowAddAll()">Add for all agents</button>
         <button class="bs" onclick="bamResetDay()" style="color:#A32D2D;border-color:#E8A0A0">↩ Reset day</button>
+        <button class="bs" onclick="closeBam()">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Add for all agents panel -->
+    <div id="bam-add-all-panel" style="display:none">
+      <div style="background:#E6F1FB;border:0.5px solid #B5D4F4;border-radius:var(--radius-md);padding:10px 12px;margin-bottom:1rem;font-size:13px;color:#0C447C">
+        Adding <strong id="bam-add-all-act-label">activity</strong> for <strong>all agents</strong> on this day.
+      </div>
+      <div class="form-row">
+        <div><label>Start time</label><input type="time" id="bam-add-all-start" oninput="bamUpdateAddAllPreview()"></div>
+        <div><label>End time</label><input type="time" id="bam-add-all-end" oninput="bamUpdateAddAllPreview()"></div>
+      </div>
+      <div style="margin-bottom:12px"><label>Activity</label><select id="bam-add-all-act" onchange="bamUpdateAddAllPreview()"></select></div>
+      <div id="bam-add-all-agents" style="margin-bottom:10px;font-size:12px;color:var(--text-secondary)"></div>
+      <div id="bam-add-all-cov" style="margin-bottom:12px"></div>
+      <div class="btn-row">
+        <button class="bp" onclick="bamConfirmAddAll()">Add for all agents</button>
+        <button class="bs" onclick="bamShowAdd()">Back</button>
         <button class="bs" onclick="closeBam()">Cancel</button>
       </div>
     </div>
@@ -2269,9 +2294,43 @@ function updateNoOBWeekBtn(){
     ptBtn.style.borderColor=ptOn?'#C0DD97':'var(--border-light)';
   }
 }
-function setMDay(d){mDay=d;renderManager();}
+function toggleCompanyHoliday(){
+  if(!managerUnlocked){requirePIN('manager',()=>toggleCompanyHoliday());return;}
+  const dateStr=toISO(dateOfDay(mDay,weekOffset));
+  // Check if all agents already on holiday for this day
+  const allOn=AGENTS.every(a=>noHoliday[dateStr]&&noHoliday[dateStr][a]);
+  if(!noHoliday[dateStr]) noHoliday[dateStr]={};
+  if(allOn){
+    // Turn off — all back to working
+    AGENTS.forEach(a=>{noHoliday[dateStr][a]=false;});
+  } else {
+    // Turn on — all agents holiday
+    AGENTS.forEach(a=>{noHoliday[dateStr][a]=true;});
+  }
+  save();renderAll();
+}
+
+function updateCompanyHolidayBtn(){
+  const btn=document.getElementById('company-holiday-btn');
+  if(!btn) return;
+  const dateStr=toISO(dateOfDay(mDay,weekOffset));
+  const allOn=AGENTS.every(a=>noHoliday[dateStr]&&noHoliday[dateStr][a]);
+  if(allOn){
+    btn.textContent='✓ Holiday — click to restore';
+    btn.style.background='#F4C0D1';
+    btn.style.color='#72243E';
+    btn.style.borderColor='#E8A0BC';
+  } else {
+    btn.textContent='🎉 Company Holiday';
+    btn.style.background='transparent';
+    btn.style.color='var(--text-secondary)';
+    btn.style.borderColor='var(--border-light)';
+  }
+}
+
+function setMDay(d){mDay=d;renderManager();updateCompanyHolidayBtn();}
 function setMgrFriWeek(w){mFW=w;renderManager();updateNoOBWeekBtn();}
-function navWeek(dir){weekOffset+=dir;renderAll();updateNoOBWeekBtn();}
+function navWeek(dir){weekOffset+=dir;renderAll();updateNoOBWeekBtn();updateCompanyHolidayBtn();}
 
 function renderAgent(){
   const aDateStr=toISO(dateOfDay(aDay,weekOffset));
@@ -2381,7 +2440,7 @@ function onAddDayChange(){
   updateEditDateDisplay();
 }
 function populateSelects(){
-  ['edit-activity','add-activity','builder-act','bam-act','bam-add-act','req-act'].forEach(id=>{
+  ['edit-activity','add-activity','builder-act','bam-act','bam-add-act','bam-add-all-act','req-act'].forEach(id=>{
     const el=document.getElementById(id);
     if(el) el.innerHTML=ACTIVITIES.map(a=>`<option>${a}</option>`).join('');
   });
@@ -2869,11 +2928,84 @@ function bamShowDelete(){
   document.getElementById('bam-add-panel').style.display='none';
   document.getElementById('bam-move-panel').style.display='none';
 }
+function bamShowAddAll(){
+  document.getElementById('bam-add-panel').style.display='none';
+  document.getElementById('bam-add-all-panel').style.display='block';
+  const act=document.getElementById('bam-add-act').value;
+  const start=document.getElementById('bam-add-start').value;
+  const end=document.getElementById('bam-add-end').value;
+  document.getElementById('bam-add-all-act').value=act;
+  document.getElementById('bam-add-all-act-label').textContent=act;
+  if(start) document.getElementById('bam-add-all-start').value=start;
+  if(end) document.getElementById('bam-add-all-end').value=end;
+  bamUpdateAddAllPreview();
+}
+
+function bamUpdateAddAllPreview(){
+  const{agent,day,fw}=bam;
+  const ns=document.getElementById('bam-add-all-start').value;
+  const ne=document.getElementById('bam-add-all-end').value;
+  const act=document.getElementById('bam-add-all-act').value;
+  document.getElementById('bam-add-all-act-label').textContent=act;
+  if(!ns||!ne||t2m(ne)<=t2m(ns)){
+    document.getElementById('bam-add-all-agents').innerHTML='';
+    document.getElementById('bam-add-all-cov').innerHTML='';
+    return;
+  }
+  const agentTZ=ATZ[agent];
+  const agentLines=AGENTS.map(a=>{
+    const tz=ATZ[a];
+    const agentNS=convertToAgentTZ(ns,agentTZ,tz);
+    const agentNE=convertToAgentTZ(ne,agentTZ,tz);
+    return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--border-light)">
+      <span style="flex:1"><strong>${a}</strong> <span style="color:var(--text-tertiary)">${tz}</span></span>
+      <span style="color:var(--text-primary)">${m2d(t2m(agentNS))}–${m2d(t2m(agentNE))}</span>
+    </div>`;
+  }).join('');
+  document.getElementById('bam-add-all-agents').innerHTML=agentLines;
+  const testBlocks=JSON.parse(JSON.stringify(getRawBlocks(agent,day,fw,bam.dateStr)));
+  testBlocks.push([act,ns,ne]);
+  testBlocks.sort((a,b)=>t2m(a[1])-t2m(b[1]));
+  document.getElementById('bam-add-all-cov').innerHTML=bamCovHTML(day,fw,agent,testBlocks);
+}
+
+function bamConfirmAddAll(){
+  const{agent,day,fw}=bam;
+  const ns=document.getElementById('bam-add-all-start').value;
+  const ne=document.getElementById('bam-add-all-end').value;
+  const act=document.getElementById('bam-add-all-act').value;
+  if(!ns||!ne){alert('Please enter start and end times.');return;}
+  if(t2m(ne)<=t2m(ns)){alert('End time must be after start time.');return;}
+  const agentTZ=ATZ[agent];
+  const dateStr=bam.dateStr||toISO(dateOfDay(day,weekOffset));
+  AGENTS.forEach(a=>{
+    const tz=ATZ[a];
+    const agentNS=convertToAgentTZ(ns,agentTZ,tz);
+    const agentNE=convertToAgentTZ(ne,agentTZ,tz);
+    const blocks=JSON.parse(JSON.stringify(getRawBlocks(a,day,fw,dateStr)));
+    blocks.push([act,agentNS,agentNE]);
+    const clean=fillGapsWithOnPhones(blocks.sort((x,y)=>t2m(x[1])-t2m(y[1])));
+    if(day==='Friday'){
+      if(!friOverrides[fw]) friOverrides[fw]={};
+      if(!friOverrides[fw][a]) friOverrides[fw][a]={};
+      friOverrides[fw][a][dateStr]=clean;
+    } else {
+      if(!schedOverrides[a]) schedOverrides[a]={};
+      schedOverrides[a][dateStr]=clean;
+    }
+    notifyAgentScheduleChange(a,dateStr,clean);
+  });
+  closeBam();
+  save();
+  renderAll();
+}
+
 function bamShowAdd(){
   document.getElementById('bam-edit-panel').style.display='none';
   document.getElementById('bam-delete-panel').style.display='none';
   document.getElementById('bam-add-panel').style.display='block';
   document.getElementById('bam-move-panel').style.display='none';
+  document.getElementById('bam-add-all-panel').style.display='none';
   bamUpdateCovPreview();
 }
 
@@ -3398,6 +3530,7 @@ function bamShowEdit(){
   document.getElementById('bam-add-panel').style.display='none';
   document.getElementById('bam-move-panel').style.display='none';
   document.getElementById('bam-move-all-panel').style.display='none';
+  document.getElementById('bam-add-all-panel').style.display='none';
   bamUpdateCovPreview();
 }
 
@@ -4022,6 +4155,29 @@ function updateReqTimeCurrent(){
     :`No ${act} currently scheduled on ${dayName}`;
 }
 
+function reqConfirmBlock(){
+  const act=document.getElementById('req-act').value;
+  const s=document.getElementById('req-start').value;
+  const e=document.getElementById('req-end').value;
+  if(!s||!e){
+    document.getElementById('req-confirm-status').innerHTML='<span style="color:#A32D2D">Please enter a start and end time.</span>';
+    return;
+  }
+  if(t2m(e)<=t2m(s)){
+    document.getElementById('req-confirm-status').innerHTML='<span style="color:#A32D2D">End time must be after start time.</span>';
+    return;
+  }
+  // Clear previous and add
+  reqBlocks=[];
+  reqBlocks.push([act,s,e]);
+  renderReqBlocks();
+  const agent=document.getElementById('req-agent').value;
+  const tz=ATZ[agent];
+  document.getElementById('req-confirm-status').innerHTML=
+    `<span style="color:#27500A">✓ Confirmed — ${act} ${m2d(t2m(s))}–${m2d(t2m(e))} ${tz}</span>`;
+  document.getElementById('req-confirm-btn').textContent='✓ Change confirmed time';
+}
+
 function reqAddBlock(){
   const act=document.getElementById('req-act').value;
   const s=document.getElementById('req-start').value;
@@ -4055,6 +4211,12 @@ function reqClear(){
   document.getElementById('req-notes').value='';
   document.getElementById('req-date').value='';
   document.getElementById('req-status').textContent='';
+  document.getElementById('req-start').value='';
+  document.getElementById('req-end').value='';
+  const statusEl=document.getElementById('req-confirm-status');
+  if(statusEl) statusEl.innerHTML='';
+  const btn=document.getElementById('req-confirm-btn');
+  if(btn) btn.textContent='✓ Confirm requested time';
 }
 
 // ── Early leave + makeup ──────────────────────────────────────
@@ -4268,47 +4430,67 @@ function renderMyRequests(agent){
   const mine=requests.filter(r=>r.agent===agent).sort((a,b)=>b.submittedAt.localeCompare(a.submittedAt));
   const el=document.getElementById('req-my-list');
   if(!mine.length){el.innerHTML='<p style="font-size:13px;color:var(--text-tertiary)">No requests submitted yet.</p>';return;}
+  const tz=ATZ[agent];
   el.innerHTML=mine.map(r=>{
     const statusColor={pending:'#BA7517',approved:'#27500A',denied:'#A32D2D',countered:'#185FA5'}[r.status]||'#888';
     const statusBg={pending:'#FAEEDA',approved:'#EAF3DE',denied:'#FCEBEB',countered:'#E6F1FB'}[r.status]||'#eee';
-    const dateDisp=new Date(r.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+    const dateDisp=new Date(r.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+    const subDate=new Date(r.submittedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'});
     const typeLabel={shift:'Shift time change',day:'Day change',permanent:'Permanent break/lunch',time:'Additional time',earlyleave:'Early leave + makeup',shadowto:'Shadowing — TO window'}[r.type]||r.type;
+
+    // Build detail
     let detail='';
     if(r.type==='shift'&&r.shiftNewStart){
-      const tz=ATZ[r.agent];
-      detail=`<div style="font-size:12px;color:var(--text-secondary);margin-bottom:3px">Requested: <strong>${m2d(t2m(r.shiftNewStart))}–${m2d(t2m(r.shiftNewEnd))} ${tz}</strong> — entire schedule shifted</div>`;
+      detail=`<div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px">Requested shift: <strong>${m2d(t2m(r.shiftNewStart))}–${m2d(t2m(r.shiftNewEnd))} ${tz}</strong></div>`;
     } else if(r.type==='time'){
       const mins=m=>m>=60?Math.floor(m/60)+'h '+(m%60?m%60+'m':''):m+'m';
-      detail=`<div style="font-size:12px;color:var(--text-secondary);margin-bottom:3px">Requested: <strong>${mins(r.timeMinutes)}</strong> of ${r.timeAct} · ${r.timeFreq==='weekly'?'Every week going forward':'This date only'}</div>`;
+      detail=`<div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px">Requested: <strong>${mins(r.timeMinutes)}</strong> of ${r.timeAct} · ${r.timeFreq==='weekly'?'Every week going forward':'This date only'}</div>`;
       if(r.approvedMinutes!=null&&r.approvedMinutes!==r.timeMinutes)
         detail+=`<div style="font-size:12px;color:#185FA5">Manager countered: <strong>${mins(r.approvedMinutes)}</strong></div>`;
     } else if(r.type==='earlyleave'){
       const fmt=h=>h>=1?h+'h':(h*60)+'m';
-      const leaveDisp=r.elLeaveTime?m2d(t2m(r.elLeaveTime)):'?';
-      detail=`<div style="font-size:12px;color:var(--text-secondary);margin-bottom:3px">Leaving at <strong>${leaveDisp}</strong> · Making up <strong>${fmt(r.elHours)}</strong> as ${r.elActivity}</div>`;
-      if(r.elMakeup&&r.elMakeup.length){
-        const mkupStatus=(r.elMakeupStatus||{});
-        detail+=`<div style="font-size:12px;color:var(--text-tertiary);margin-top:3px">${r.elMakeup.map(d=>{
-          const disp=new Date(d.date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
-          const ds=mkupStatus[d.date];
-          const st=ds?.status||'pending';
-          const stC={approved:'#27500A',denied:'#A32D2D',pending:'#BA7517'}[st];
-          return`${disp} <span style="color:${stC}">(${st})</span>`;
-        }).join(' · ')}</div>`;
-      }
-    } else if(r.blocks.length){
-      detail=`<div style="font-size:12px;color:var(--text-secondary);margin-bottom:3px">Proposed: ${r.blocks.map(b=>`${b[0]} ${m2d(t2m(b[1]))}–${m2d(t2m(b[2]))}`).join(', ')}</div>`;
+      detail=`<div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px">Leaving at <strong>${r.elLeaveTime?m2d(t2m(r.elLeaveTime)):'?'}</strong> · Making up <strong>${fmt(r.elHours)}</strong> as ${r.elActivity}</div>`;
+    } else if(r.type==='shadowto'&&r.shadowtoStart){
+      detail=`<div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px">Shadowing — TO window: <strong>${m2d(t2m(r.shadowtoStart))}–${m2d(t2m(r.shadowtoEnd))} ${tz}</strong></div>`;
+    } else if(r.blocks&&r.blocks.length){
+      detail=r.blocks.map(b=>{
+        const c=COLORS[b[0]]||{bg:'#D3D1C7',text:'#444441'};
+        const dur=t2m(b[2])-t2m(b[1]);
+        return`<div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:3px">
+          <div style="width:8px;height:8px;border-radius:2px;flex-shrink:0;background:${c.bg}"></div>
+          <strong>${b[0]}</strong>
+          <span style="color:var(--text-secondary)">${m2d(t2m(b[1]))}–${m2d(t2m(b[2]))} <span style="color:#185FA5">${tz}</span></span>
+          <span style="color:var(--text-tertiary);font-size:11px">(${dur}m)</span>
+        </div>`;
+      }).join('');
     }
+
+    const deleteBtn=r.status==='pending'
+      ?`<button onclick="deleteMyRequest('${r.id}','${agent}')" style="font-size:11px;padding:2px 8px;border-radius:20px;cursor:pointer;font-family:var(--font);border:0.5px solid #E8A0A0;background:#FCEBEB;color:#A32D2D">✕ Delete</button>`
+      :'';
+
     return`<div style="border:0.5px solid var(--border-light);border-radius:var(--radius-md);padding:10px 14px;margin-bottom:8px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;gap:6px;flex-wrap:wrap">
         <span style="font-size:13px;font-weight:500">${typeLabel} · ${dateDisp}</span>
-        <span style="font-size:11px;padding:2px 8px;border-radius:20px;font-weight:500;background:${statusBg};color:${statusColor}">${r.status}</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:11px;padding:2px 8px;border-radius:20px;font-weight:500;background:${statusBg};color:${statusColor}">${r.status}</span>
+          ${deleteBtn}
+        </div>
       </div>
+      <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:6px">Submitted ${subDate}</div>
       ${detail}
-      ${r.notes?`<div style="font-size:12px;color:var(--text-secondary)">"${r.notes}"</div>`:''}
-      ${r.managerNote?`<div style="font-size:12px;color:var(--text-tertiary);margin-top:4px">Manager: "${r.managerNote}"</div>`:''}
+      ${r.notes?`<div style="font-size:12px;color:var(--text-secondary);margin-top:4px;font-style:italic">"${r.notes}"</div>`:''}
+      ${r.managerNote?`<div style="font-size:12px;color:var(--text-tertiary);margin-top:4px">Manager note: "${r.managerNote}"</div>`:''}
     </div>`;
   }).join('');
+}
+
+function deleteMyRequest(id,agent){
+  if(!confirm('Delete this request? Your manager will no longer see it.')) return;
+  requests=requests.filter(r=>r.id!==id);
+  saveRequests();
+  updateReqBadge();
+  renderMyRequests(agent);
 }
 
 // ── Manager review ────────────────────────────────────────────
@@ -4750,6 +4932,15 @@ function reqClearAll(){
   if(!confirm('Remove all approved/denied requests? Pending requests will stay.'))return;
   requests=requests.filter(r=>r.status==='pending');
   saveRequests();
+  updateReqBadge();
+  renderReviewList();
+}
+
+function reqClearEverything(){
+  if(!confirm('Delete ALL requests including pending? This cannot be undone.'))return;
+  requests=[];
+  saveRequests();
+  updateReqBadge();
   renderReviewList();
 }
 
@@ -4888,6 +5079,7 @@ function renderAll(){
   try{if(document.getElementById('view-transfers').classList.contains('active'))renderTransfersOnly();}catch(e){}
   try{updateReqBadge();}catch(e){}
   try{updateNoOBWeekBtn();}catch(e){}
+  try{updateCompanyHolidayBtn();}catch(e){}
 }
 
 // ── Copy from previous week ───────────────────────────────────
