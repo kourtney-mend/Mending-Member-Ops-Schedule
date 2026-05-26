@@ -169,6 +169,7 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <button onclick="openNoOBModal()" id="no-ob-week-btn" style="font-size:12px;padding:4px 12px;border:0.5px solid var(--border-light);border-radius:var(--radius-md);background:transparent;cursor:pointer;color:var(--text-secondary);font-family:var(--font)">📵 No OB</button>
         <button onclick="openNoPTModal()" id="no-pt-week-btn" style="font-size:12px;padding:4px 12px;border:0.5px solid var(--border-light);border-radius:var(--radius-md);background:transparent;cursor:pointer;color:var(--text-secondary);font-family:var(--font)">⏸ No PT</button>
+        <button onclick="toggleExtendedTicketTime()" id="ext-tt-btn" style="font-size:12px;padding:4px 12px;border:0.5px solid var(--border-light);border-radius:var(--radius-md);background:transparent;cursor:pointer;color:var(--text-secondary);font-family:var(--font)">🎫 Extended TT</button>
         <button onclick="toggleCompanyHoliday()" id="company-holiday-btn" style="font-size:12px;padding:4px 12px;border:0.5px solid var(--border-light);border-radius:var(--radius-md);background:transparent;cursor:pointer;color:var(--text-secondary);font-family:var(--font)">🎉 Company Holiday</button>
         <button onclick="sendTodaySchedules()" id="send-schedules-btn" style="font-size:12px;padding:4px 12px;border:0.5px solid var(--border-light);border-radius:var(--radius-md);background:transparent;cursor:pointer;color:var(--text-secondary);font-family:var(--font)">📅 Send today's schedules</button>
         <span id="send-schedules-status" style="font-size:11px;color:var(--text-tertiary)"></span>
@@ -1129,22 +1130,31 @@ async function pullFromGitHub(){
 
 async function _doPullFromGitHub(){
   try{
-    const pageUrl=`https://${ghUser}.github.io/${ghRepo}/${GH_FILE}?t=${Date.now()}`;
-    const rawUrl=`https://raw.githubusercontent.com/${ghUser}/${ghRepo}/main/${GH_FILE}?t=${Date.now()}`;
-
+    const token=ghToken||GH_SHARED_TOKEN;
     let raw=null;
-    // Try Pages URL first
-    try{
-      const r=await fetch(pageUrl);
-      if(r.ok) raw=await r.json();
-    }catch(e){}
 
-    // Fall back to raw URL
-    if(!raw){
+    // For private repos, use the authenticated GitHub API to read the file
+    if(token){
       try{
-        const r=await fetch(rawUrl);
-        if(r.ok) raw=await r.json();
+        const apiUrl=`https://api.github.com/repos/${ghUser}/${ghRepo}/contents/${GH_FILE}`;
+        const r=await fetch(apiUrl,{
+          headers:{'Authorization':`Bearer ${token}`,'Accept':'application/vnd.github+json'}
+        });
+        if(r.ok){
+          const fileData=await r.json();
+          // File content is base64 encoded
+          const decoded=decodeURIComponent(escape(atob(fileData.content.replace(/\n/g,''))));
+          raw=JSON.parse(decoded);
+        }
       }catch(e){}
+    }
+
+    // Fallback to public URLs (works if repo is public)
+    if(!raw){
+      const pageUrl=`https://${ghUser}.github.io/${ghRepo}/${GH_FILE}?t=${Date.now()}`;
+      const rawUrl=`https://raw.githubusercontent.com/${ghUser}/${ghRepo}/main/${GH_FILE}?t=${Date.now()}`;
+      try{const r=await fetch(pageUrl);if(r.ok)raw=await r.json();}catch(e){}
+      if(!raw){try{const r=await fetch(rawUrl);if(r.ok)raw=await r.json();}catch(e){}}
     }
 
     if(!raw) return false;
@@ -2298,16 +2308,123 @@ function updateNoOBWeekBtn(){
     ptBtn.style.borderColor=ptOn?'#C0DD97':'var(--border-light)';
   }
 }
+function toggleExtendedTicketTime(){
+  if(!managerUnlocked){requirePIN('manager',()=>toggleExtendedTicketTime());return;}
+  const dateStr=toISO(dateOfDay(mDay,weekOffset));
+  const fw=mDay==='Friday'?mFW:1;
+  const EXTEND_BY=15; // minutes
+
+  // Check current state — has TT already been extended for all agents today?
+  const allExtended=AGENTS.every(a=>{
+    const blocks=getRawBlocks(a,mDay,fw,dateStr);
+    const tt=blocks.find(b=>b[0]==='Ticket Time');
+    return tt&&(t2m(tt[2])-t2m(tt[1]))>30;
+  });
+
+  AGENTS.forEach(a=>{
+    const blocks=JSON.parse(JSON.stringify(getRawBlocks(a,mDay,fw,dateStr)));
+    const ttIdx=blocks.findIndex(b=>b[0]==='Ticket Time');
+    if(ttIdx===-1) return; // no ticket time for this agent today
+
+    const tt=blocks[ttIdx];
+    const ttStart=t2m(tt[1]);
+    const ttEnd=t2m(tt[2]);
+    const ttDur=ttEnd-ttStart;
+
+    if(allExtended){
+      // Revert — shrink TT back by 15 min and shift following blocks back
+      const newEnd=ttEnd-EXTEND_BY;
+      blocks[ttIdx][2]=m2t(newEnd);
+      // Shift all subsequent blocks back by 15 min
+      for(let i=ttIdx+1;i<blocks.length;i++){
+        const bs=t2m(blocks[i][1]),be=t2m(blocks[i][2]);
+        // Only shift if block starts exactly at or after old TT end
+        if(bs>=ttEnd-EXTEND_BY){
+          blocks[i][1]=m2t(bs-EXTEND_BY);
+          blocks[i][2]=m2t(be-EXTEND_BY);
+        }
+      }
+    } else {
+      // Extend TT by 15 min
+      const newEnd=ttEnd+EXTEND_BY;
+      blocks[ttIdx][2]=m2t(newEnd);
+
+      // Handle the next block
+      if(ttIdx+1<blocks.length){
+        const next=blocks[ttIdx+1];
+        const nextStart=t2m(next[1]);
+
+        if(nextStart===ttEnd){
+          // Next block starts exactly where TT ended
+          if(next[0]==='On Phones'){
+            // Trim On Phones — absorbs the extension
+            const nextEnd=t2m(next[2]);
+            if(nextEnd<=newEnd){
+              // On Phones fully consumed — remove it
+              blocks.splice(ttIdx+1,1);
+            } else {
+              blocks[ttIdx+1][1]=m2t(newEnd);
+            }
+          } else {
+            // Protected block (Break, Lunch, etc.) — shift it and everything after forward
+            for(let i=ttIdx+1;i<blocks.length;i++){
+              blocks[i][1]=m2t(t2m(blocks[i][1])+EXTEND_BY);
+              blocks[i][2]=m2t(t2m(blocks[i][2])+EXTEND_BY);
+            }
+          }
+        }
+      }
+    }
+
+    // Clean up zero-length blocks and re-run gap fill
+    const clean=fillGapsWithOnPhones(
+      blocks.filter(b=>t2m(b[2])>t2m(b[1])).sort((x,y)=>t2m(x[1])-t2m(y[1]))
+    );
+
+    if(mDay==='Friday'){
+      if(!friOverrides[fw]) friOverrides[fw]={};
+      if(!friOverrides[fw][a]) friOverrides[fw][a]={};
+      friOverrides[fw][a][dateStr]=clean;
+    } else {
+      if(!schedOverrides[a]) schedOverrides[a]={};
+      schedOverrides[a][dateStr]=clean;
+    }
+    notifyAgentScheduleChange(a,dateStr,clean);
+  });
+
+  save();renderAll();
+}
+
+function updateExtTTBtn(){
+  const btn=document.getElementById('ext-tt-btn');
+  if(!btn) return;
+  const dateStr=toISO(dateOfDay(mDay,weekOffset));
+  const fw=mDay==='Friday'?mFW:1;
+  const allExtended=AGENTS.every(a=>{
+    const blocks=getRawBlocks(a,mDay,fw,dateStr);
+    const tt=blocks.find(b=>b[0]==='Ticket Time');
+    return tt&&(t2m(tt[2])-t2m(tt[1]))>30;
+  });
+  if(allExtended){
+    btn.textContent='✓ Extended TT — click to restore';
+    btn.style.background='#FDE68A';
+    btn.style.color='#78350F';
+    btn.style.borderColor='#FCD34D';
+  } else {
+    btn.textContent='🎫 Extended TT';
+    btn.style.background='transparent';
+    btn.style.color='var(--text-secondary)';
+    btn.style.borderColor='var(--border-light)';
+  }
+}
+
 function toggleCompanyHoliday(){
   if(!managerUnlocked){requirePIN('manager',()=>toggleCompanyHoliday());return;}
   const dateStr=toISO(dateOfDay(mDay,weekOffset));
-  // Check if all agents already OOO for this day
   const allOn=AGENTS.every(a=>ooo[a]&&ooo[a][dateStr]===true);
   if(allOn){
-    // Turn off — restore all agents
     AGENTS.forEach(a=>{if(ooo[a]) ooo[a][dateStr]=false;});
   } else {
-    // Mark all agents OOO — company is closed
     AGENTS.forEach(a=>{
       if(!ooo[a]) ooo[a]={};
       ooo[a][dateStr]=true;
@@ -2334,9 +2451,9 @@ function updateCompanyHolidayBtn(){
   }
 }
 
-function setMDay(d){mDay=d;renderManager();updateCompanyHolidayBtn();}
+function setMDay(d){mDay=d;renderManager();updateCompanyHolidayBtn();updateExtTTBtn();}
 function setMgrFriWeek(w){mFW=w;renderManager();updateNoOBWeekBtn();}
-function navWeek(dir){weekOffset+=dir;renderAll();updateNoOBWeekBtn();updateCompanyHolidayBtn();}
+function navWeek(dir){weekOffset+=dir;renderAll();updateNoOBWeekBtn();updateCompanyHolidayBtn();updateExtTTBtn();}
 
 function renderAgent(){
   const aDateStr=toISO(dateOfDay(aDay,weekOffset));
@@ -5092,6 +5209,7 @@ function renderAll(){
   try{updateReqBadge();}catch(e){}
   try{updateNoOBWeekBtn();}catch(e){}
   try{updateCompanyHolidayBtn();}catch(e){}
+  try{updateExtTTBtn();}catch(e){}
 }
 
 // ── Copy from previous week ───────────────────────────────────
@@ -5292,14 +5410,19 @@ try{
   setSS('saved'); // always show saved so app is usable even if something fails
 }
 setInterval(()=>{
-  renderManager();renderAgent();
-  // Pull latest from GitHub every 60s
+  // Pull latest from GitHub every 30s so agents see schedule changes promptly
   if(ghUser&&ghRepo&&!_ghPullBlocked){
     pullFromGitHub().then(ok=>{
-      if(ok){renderAll();renderReviewList();updateReqBadge();}
+      if(ok){
+        try{renderAll();}catch(e){}
+        try{if(document.getElementById('view-review').classList.contains('active')) renderReviewList();}catch(e){}
+        try{updateReqBadge();}catch(e){}
+      }
     });
+  } else {
+    try{renderManager();renderAgent();}catch(e){}
   }
-},60000);
+},30000);
 </script>
 
 </body>
