@@ -1026,7 +1026,7 @@ const GH_KEY='mending-github-v1';
 const GH_FILE='schedule-data.json';
 const GH_PUBLIC_USER='kourtney-mend';
 const GH_PUBLIC_REPO='Mending-Member-Ops-Schedule';
-const GH_SHARED_TOKEN='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';
+const GH_SHARED_TOKEN='';
 let ghUser=GH_PUBLIC_USER,ghRepo=GH_PUBLIC_REPO,ghToken='';
 
 function loadGitHubSettings(){
@@ -1076,7 +1076,7 @@ function buildGHPayload(){
 }
 
 async function pushToGitHub(silent=false){
-  const token=ghToken||GH_SHARED_TOKEN;
+  const token=ghToken;
   if(!ghUser||!ghRepo||!token){
     if(!silent) document.getElementById('gh-status').innerHTML='<span style="color:#A32D2D">✗ Please fill in all GitHub settings first.</span>';
     return false;
@@ -1130,31 +1130,23 @@ async function pullFromGitHub(){
 
 async function _doPullFromGitHub(){
   try{
-    const token=ghToken||GH_SHARED_TOKEN;
-    let raw=null;
+    const pageUrl=`https://${ghUser}.github.io/${ghRepo}/${GH_FILE}?t=${Date.now()}`;
+    const rawUrl=`https://raw.githubusercontent.com/${ghUser}/${ghRepo}/main/${GH_FILE}?t=${Date.now()}`;
 
-    // For private repos, use the authenticated GitHub API to read the file
-    if(token){
+    let raw=null;
+    try{const r=await fetch(pageUrl);if(r.ok)raw=await r.json();}catch(e){}
+    if(!raw){try{const r=await fetch(rawUrl);if(r.ok)raw=await r.json();}catch(e){}}
+
+    // If public URLs fail, try authenticated (for manager's browser which has ghToken)
+    if(!raw&&ghToken){
       try{
         const apiUrl=`https://api.github.com/repos/${ghUser}/${ghRepo}/contents/${GH_FILE}`;
-        const r=await fetch(apiUrl,{
-          headers:{'Authorization':`Bearer ${token}`,'Accept':'application/vnd.github+json'}
-        });
+        const r=await fetch(apiUrl,{headers:{'Authorization':`Bearer ${ghToken}`,'Accept':'application/vnd.github+json'}});
         if(r.ok){
           const fileData=await r.json();
-          // File content is base64 encoded
-          const decoded=decodeURIComponent(escape(atob(fileData.content.replace(/\n/g,''))));
-          raw=JSON.parse(decoded);
+          raw=JSON.parse(decodeURIComponent(escape(atob(fileData.content.replace(/\n/g,'')))));
         }
       }catch(e){}
-    }
-
-    // Fallback to public URLs (works if repo is public)
-    if(!raw){
-      const pageUrl=`https://${ghUser}.github.io/${ghRepo}/${GH_FILE}?t=${Date.now()}`;
-      const rawUrl=`https://raw.githubusercontent.com/${ghUser}/${ghRepo}/main/${GH_FILE}?t=${Date.now()}`;
-      try{const r=await fetch(pageUrl);if(r.ok)raw=await r.json();}catch(e){}
-      if(!raw){try{const r=await fetch(rawUrl);if(r.ok)raw=await r.json();}catch(e){}}
     }
 
     if(!raw) return false;
@@ -4145,9 +4137,7 @@ function saveRequests(){
   localStorage.setItem(RQK,JSON.stringify(requests));
   clearTimeout(saveRequests._timer);
   saveRequests._timer=setTimeout(()=>{
-    // Use full save() if manager token available — more reliable
-    // Fall back to pushRequestsToGitHub for agents
-    if(ghToken) save();
+    if(ghToken) pushToGitHub(true);
     else pushRequestsToGitHub();
   },1500);
 }
