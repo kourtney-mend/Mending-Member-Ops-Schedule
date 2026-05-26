@@ -1167,12 +1167,13 @@ async function _doPullFromGitHub(){
       return result;
     }
 
-    if(raw.schedOverrides) schedOverrides=mergeDeep(schedOverrides,raw.schedOverrides);
-    if(raw.friOverrides) friOverrides=mergeDeep(friOverrides,raw.friOverrides);
-    if(raw.noOB) noOB=mergeDeep(noOB,raw.noOB);
-    if(raw.noPT) noPT=mergeDeep(noPT,raw.noPT);
-    if(raw.noHoliday) noHoliday=mergeDeep(noHoliday,raw.noHoliday);
-    if(raw.ooo) ooo=mergeDeep(ooo,raw.ooo);
+    // Schedule data — remote is always authoritative (only manager pushes this)
+    if(raw.schedOverrides) schedOverrides=raw.schedOverrides;
+    if(raw.friOverrides) friOverrides=raw.friOverrides;
+    if(raw.noOB) noOB=raw.noOB;
+    if(raw.noPT) noPT=raw.noPT;
+    if(raw.noHoliday) noHoliday=raw.noHoliday;
+    if(raw.ooo) ooo=raw.ooo;
     // Read manager webhook and token from GitHub so agents can submit and notify
     if(raw._managerWebhook) remoteManagerWebhook=raw._managerWebhook;
 
@@ -1657,7 +1658,7 @@ function gBlocks(agent,day,fw,tS,tF){
     return partial;
   }
   const someoneOOO=AGENTS.filter(a=>a!==agent&&ooo[a]&&ooo[a][dateStr]===true).length>0;
-  // Only apply simplified coverage if there's no manual override for this agent on this date
+  // If agent has a manual override for this date, always use it — never apply OOO coverage on top
   const hasManualOverride=day==='Friday'
     ?!!(friOverrides[fw]&&friOverrides[fw][agent]&&friOverrides[fw][agent][dateStr])
     :!!(schedOverrides[agent]&&schedOverrides[agent][dateStr]);
