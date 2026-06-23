@@ -166,10 +166,11 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
   <div id="view-manager" class="view active">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;gap:8px">
       <button onclick="openCopyModal()" style="font-size:12px;padding:4px 12px;border:0.5px solid var(--border-light);border-radius:var(--radius-md);background:transparent;cursor:pointer;color:var(--text-secondary);font-family:var(--font)">Copy from prev week</button>
+      <button onclick="requirePIN('manager',resetOverridesOnly)" style="font-size:12px;padding:4px 12px;border:0.5px solid #E8A0A0;border-radius:var(--radius-md);background:#FCEBEB;cursor:pointer;color:#A32D2D;font-family:var(--font)">↩ Reset to base schedule</button>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <button onclick="openNoOBModal()" id="no-ob-week-btn" style="font-size:12px;padding:4px 12px;border:0.5px solid var(--border-light);border-radius:var(--radius-md);background:transparent;cursor:pointer;color:var(--text-secondary);font-family:var(--font)">📵 No OB</button>
+        <button onclick="toggleExtendOB()" id="ext-ob-btn" style="font-size:12px;padding:4px 12px;border:0.5px solid var(--border-light);border-radius:var(--radius-md);background:transparent;cursor:pointer;color:var(--text-secondary);font-family:var(--font)">📤 Extend OB</button>
         <button onclick="openNoPTModal()" id="no-pt-week-btn" style="font-size:12px;padding:4px 12px;border:0.5px solid var(--border-light);border-radius:var(--radius-md);background:transparent;cursor:pointer;color:var(--text-secondary);font-family:var(--font)">⏸ No PT</button>
-        <button onclick="toggleExtendedTicketTime()" id="ext-tt-btn" style="font-size:12px;padding:4px 12px;border:0.5px solid var(--border-light);border-radius:var(--radius-md);background:transparent;cursor:pointer;color:var(--text-secondary);font-family:var(--font)">🎫 Extended TT</button>
         <button onclick="toggleCompanyHoliday()" id="company-holiday-btn" style="font-size:12px;padding:4px 12px;border:0.5px solid var(--border-light);border-radius:var(--radius-md);background:transparent;cursor:pointer;color:var(--text-secondary);font-family:var(--font)">🎉 Company Holiday</button>
         <button onclick="sendTodaySchedules()" id="send-schedules-btn" style="font-size:12px;padding:4px 12px;border:0.5px solid var(--border-light);border-radius:var(--radius-md);background:transparent;cursor:pointer;color:var(--text-secondary);font-family:var(--font)">📅 Send today's schedules</button>
         <span id="send-schedules-status" style="font-size:11px;color:var(--text-tertiary)"></span>
@@ -930,7 +931,7 @@ function m2d(m){m=((m%1440)+1440)%1440;const h=Math.floor(m/60),mn=m%60,ap=h>=12
 const BASE={
   Ebony:{
     Monday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['Outbound','10:00','10:30'],['On Phones','10:30','11:00'],['Break 1','11:00','11:15'],['On Phones','11:15','13:15'],['Break 2','13:15','13:30'],['On Phones','13:30','15:00'],['Lunch','15:00','15:30'],['On Phones','15:30','16:00'],['Weekly Sync','16:00','16:30'],['On Phones','16:30','17:00']],
-    Tuesday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['Outbound','10:00','10:30'],['On Phones','10:30','11:00'],['Break 1','11:00','11:15'],['On Phones','11:15','13:15'],['Break 2','13:15','13:30'],['Project Time','13:30','14:30'],['On Phones','14:30','15:00'],['Lunch','15:00','15:30'],['On Phones','15:30','17:00']],
+    Tuesday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['Outbound','10:00','10:30'],['On Phones','10:30','11:00'],['Break 1','11:00','11:15'],['On Phones','11:15','13:15'],['Break 2','13:15','13:30'],['On Phones','13:30','15:00'],['Lunch','15:00','15:30'],['On Phones','15:30','17:00']],
     Wednesday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['Outbound','10:00','10:30'],['On Phones','10:30','11:00'],['Break 1','11:00','11:15'],['On Phones','11:15','12:00'],['1:1','12:00','12:30'],['On Phones','12:30','13:15'],['Break 2','13:15','13:30'],['On Phones','13:30','15:00'],['Lunch','15:00','15:30'],['On Phones','15:30','17:00']],
     Thursday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['Outbound','10:00','10:30'],['On Phones','10:30','11:00'],['Break 1','11:00','11:15'],['On Phones','11:15','13:15'],['Break 2','13:15','13:30'],['On Phones','13:30','15:00'],['Lunch','15:00','15:30'],['On Phones','15:30','17:00']],
   },
@@ -938,12 +939,12 @@ const BASE={
     Monday:[['On Phones','08:30','09:00'],['Ticket Time','09:00','09:30'],['On Phones','09:30','10:45'],['Break 1','10:45','11:00'],['On Phones','11:00','13:15'],['Break 2','13:15','13:30'],['Lunch','13:30','14:00'],['Outbound','14:00','14:30'],['On Phones','14:30','15:00'],['Weekly Sync','15:00','15:30'],['On Phones','15:30','16:30']],
     Tuesday:[['On Phones','08:30','09:00'],['Ticket Time','09:00','09:30'],['On Phones','09:30','10:45'],['Break 1','10:45','11:00'],['On Phones','11:00','13:30'],['1:1','13:30','14:00'],['On Phones','14:00','14:15'],['Lunch','14:15','14:45'],['Break 2','14:45','15:00'],['Outbound','15:00','15:30'],['On Phones','15:30','16:30']],
     Wednesday:[['On Phones','08:30','09:00'],['Ticket Time','09:00','09:30'],['On Phones','09:30','10:45'],['Break 1','10:45','11:00'],['On Phones','11:00','14:15'],['Break 2','14:15','14:30'],['Lunch','14:30','15:00'],['Outbound','15:00','15:30'],['On Phones','15:30','16:30']],
-    Thursday:[['On Phones','08:30','09:00'],['Ticket Time','09:00','09:30'],['On Phones','09:30','10:45'],['Break 1','10:45','11:00'],['On Phones','11:00','13:00'],['Project Time','13:00','14:00'],['Lunch','14:00','14:30'],['Break 2','14:30','14:45'],['On Phones','14:45','15:00'],['Outbound','15:00','15:30'],['On Phones','15:30','16:30']],
+    Thursday:[['On Phones','08:30','09:00'],['Ticket Time','09:00','09:30'],['On Phones','09:30','10:45'],['Break 1','10:45','11:00'],['On Phones','11:00','13:00'],['On Phones','13:00','14:00'],['Lunch','14:00','14:30'],['Break 2','14:30','14:45'],['On Phones','14:45','15:00'],['Outbound','15:00','15:30'],['On Phones','15:30','16:30']],
   },
   Ky:{
     Monday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['On Phones','10:00','11:30'],['Lunch','11:30','12:00'],['Break 1','12:00','12:15'],['On Phones','12:15','14:45'],['Break 2','14:45','15:00'],['Weekly Sync','15:00','15:30'],['Outbound','15:30','16:00'],['On Phones','16:00','17:00']],
     Tuesday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['On Phones','10:00','11:30'],['Lunch','11:30','12:00'],['Break 1','12:00','12:15'],['On Phones','12:15','15:00'],['Break 2','15:00','15:15'],['Outbound','15:15','15:45'],['On Phones','15:45','17:00']],
-    Wednesday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['On Phones','10:00','11:30'],['Lunch','11:30','12:00'],['Break 1','12:00','12:15'],['Project Time','12:15','13:15'],['On Phones','13:15','15:00'],['Break 2','15:00','15:15'],['Outbound','15:15','15:45'],['On Phones','15:45','17:00']],
+    Wednesday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['On Phones','10:00','11:30'],['Lunch','11:30','12:00'],['Break 1','12:00','12:15'],['On Phones','12:15','15:00'],['Break 2','15:00','15:15'],['Outbound','15:15','15:45'],['On Phones','15:45','17:00']],
     Thursday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['On Phones','10:00','11:30'],['Lunch','11:30','12:00'],['Break 1','12:00','12:15'],['On Phones','12:15','12:30'],['1:1','12:30','13:00'],['On Phones','13:00','15:00'],['Break 2','15:00','15:15'],['Outbound','15:15','15:45'],['On Phones','15:45','17:00']],
   }
 };
@@ -1635,7 +1636,12 @@ function gBlocks(agent,day,fw,tS,tF){
       blocks=mergeOP(blocks.map(x=>x[0]==='Outbound'?['On Phones',x[1],x[2]]:x));
     }
     if(day!=='Friday'&&(indefiniteNoPT||(noPT[dateStr]&&noPT[dateStr][agent]))){
-      blocks=mergeOP(blocks.map(x=>x[0]==='Project Time'?['On Phones',x[1],x[2]]:x));
+      // PT is toggled ON — add Project Time blocks from the original base schedule
+      const basePT=BASE[agent]&&BASE[agent][day]?BASE[agent][day].filter(b=>b[0]==='Project Time'):[];
+      if(basePT.length){
+        basePT.forEach(pt=>{ blocks.push([...pt]); });
+        blocks=fillGapsWithOnPhones(blocks.sort((a,b)=>t2m(a[1])-t2m(b[1])));
+      }
     }
   }
   // Full-day OOO — return blocks untransformed (agent is out)
@@ -2200,7 +2206,7 @@ function openNoOBModal(){
   document.getElementById('no-act-desc').textContent=isOn
     ?'Outbound is currently off for all agents. Turn it back on?'
     :'Turn off Outbound for all agents — choose how long.';
-  document.getElementById('no-act-confirm-btn').textContent=isOn?'Turn back on':'Turn off';
+  document.getElementById('no-act-confirm-btn').textContent=isOn?'Turn off PT':'Add PT';
   document.querySelector('input[name="no-act-scope"][value="week"]').checked=true;
   // Hide scope options if turning back on
   document.querySelectorAll('input[name="no-act-scope"]').forEach(r=>{
@@ -2213,11 +2219,11 @@ function openNoPTModal(){
   if(!managerUnlocked){requirePIN('manager',()=>openNoPTModal());return;}
   _noActType='pt';
   const isOn=indefiniteNoPT||isWeekNoPT();
-  document.getElementById('no-act-title').textContent=isOn?'Turn Project Time back on':'Turn off Project Time';
+  document.getElementById('no-act-title').textContent=isOn?'Turn off Project Time':'Add Project Time';
   document.getElementById('no-act-desc').textContent=isOn
     ?'Project Time is currently off for all agents. Turn it back on?'
     :'Turn off Project Time for all agents — choose how long.';
-  document.getElementById('no-act-confirm-btn').textContent=isOn?'Turn back on':'Turn off';
+  document.getElementById('no-act-confirm-btn').textContent=isOn?'Turn off PT':'Add PT';
   document.querySelector('input[name="no-act-scope"][value="week"]').checked=true;
   document.querySelectorAll('input[name="no-act-scope"]').forEach(r=>{
     r.closest('label').style.display=isOn?'none':'flex';
@@ -2295,24 +2301,22 @@ function updateNoOBWeekBtn(){
   const ptBtn=document.getElementById('no-pt-week-btn');
   if(ptBtn){
     const ptOn=indefiniteNoPT||isWeekNoPT();
-    ptBtn.textContent=indefiniteNoPT?'⏸ No PT (indefinite)':ptOn?'⏸ No PT (this week)':'⏸ No PT';
-    ptBtn.style.background=ptOn?'#EAF3DE':'transparent';
+    ptBtn.textContent=indefiniteNoPT?'⏸ No PT (indefinite)':ptOn?'⏸ No PT (this week)':'📋 Add PT';
+    ptBtn.style.background=ptOn?'#C0DD97':'transparent';
     ptBtn.style.color=ptOn?'#27500A':'var(--text-secondary)';
-    ptBtn.style.borderColor=ptOn?'#C0DD97':'var(--border-light)';
+    ptBtn.style.borderColor=ptOn?'#86C95E':'var(--border-light)';
   }
 }
-function toggleExtendedTicketTime(){
-  if(!managerUnlocked){requirePIN('manager',()=>toggleExtendedTicketTime());return;}
+function toggleExtendOB(){
+  if(!managerUnlocked){requirePIN('manager',()=>toggleExtendOB());return;}
   const dateStr=toISO(dateOfDay(mDay,weekOffset));
   const fw=mDay==='Friday'?mFW:1;
 
-  // Check current state — has extra TT already been added after OB for all agents?
+  // Check if OB is already extended (OB block is 60min) for all agents
   const allExtended=AGENTS.every(a=>{
     const blocks=getRawBlocks(a,mDay,fw,dateStr);
-    const obIdx=blocks.findIndex(b=>b[0]==='Outbound');
-    if(obIdx===-1) return false;
-    const afterOB=blocks[obIdx+1];
-    return afterOB&&afterOB[0]==='Ticket Time';
+    const ob=blocks.find(b=>b[0]==='Outbound');
+    return ob&&(t2m(ob[2])-t2m(ob[1]))>=60;
   });
 
   AGENTS.forEach(a=>{
@@ -2320,18 +2324,14 @@ function toggleExtendedTicketTime(){
     const obIdx=blocks.findIndex(b=>b[0]==='Outbound');
     if(obIdx===-1) return;
 
-    const obEnd=t2m(blocks[obIdx][2]);
-
     if(allExtended){
-      // Remove the extra TT block after OB
-      if(blocks[obIdx+1]&&blocks[obIdx+1][0]==='Ticket Time'){
-        blocks.splice(obIdx+1,1);
-      }
+      // Revert — trim OB back to 30 min, fill gap with On Phones
+      const obStart=t2m(blocks[obIdx][1]);
+      blocks[obIdx][2]=m2t(obStart+30);
     } else {
-      // Insert 30min Ticket Time right after OB
-      const ttStart=m2t(obEnd);
-      const ttEnd=m2t(obEnd+30);
-      blocks.splice(obIdx+1,0,['Ticket Time',ttStart,ttEnd]);
+      // Extend OB by 30 min — push end time forward
+      const obEnd=t2m(blocks[obIdx][2]);
+      blocks[obIdx][2]=m2t(obEnd+30);
     }
 
     const clean=fillGapsWithOnPhones(
@@ -2352,29 +2352,29 @@ function toggleExtendedTicketTime(){
   save();renderAll();
 }
 
-function updateExtTTBtn(){
-  const btn=document.getElementById('ext-tt-btn');
+function updateExtOBBtn(){
+  const btn=document.getElementById('ext-ob-btn');
   if(!btn) return;
   const dateStr=toISO(dateOfDay(mDay,weekOffset));
   const fw=mDay==='Friday'?mFW:1;
   const allExtended=AGENTS.every(a=>{
     const blocks=getRawBlocks(a,mDay,fw,dateStr);
-    const obIdx=blocks.findIndex(b=>b[0]==='Outbound');
-    if(obIdx===-1) return false;
-    return blocks[obIdx+1]&&blocks[obIdx+1][0]==='Ticket Time';
+    const ob=blocks.find(b=>b[0]==='Outbound');
+    return ob&&(t2m(ob[2])-t2m(ob[1]))>=60;
   });
   if(allExtended){
-    btn.textContent='✓ Extended TT — click to restore';
-    btn.style.background='#FDE68A';
-    btn.style.color='#78350F';
-    btn.style.borderColor='#FCD34D';
+    btn.textContent='✓ OB Extended — click to restore';
+    btn.style.background='#9FE1CB';
+    btn.style.color='#085041';
+    btn.style.borderColor='#6BC9A8';
   } else {
-    btn.textContent='🎫 Extended TT';
+    btn.textContent='📤 Extend OB';
     btn.style.background='transparent';
     btn.style.color='var(--text-secondary)';
     btn.style.borderColor='var(--border-light)';
   }
 }
+
 
 function toggleCompanyHoliday(){
   if(!managerUnlocked){requirePIN('manager',()=>toggleCompanyHoliday());return;}
@@ -2409,9 +2409,9 @@ function updateCompanyHolidayBtn(){
   }
 }
 
-function setMDay(d){mDay=d;renderManager();updateCompanyHolidayBtn();updateExtTTBtn();}
+function setMDay(d){mDay=d;renderManager();updateCompanyHolidayBtn();updateExtOBBtn();}
 function setMgrFriWeek(w){mFW=w;renderManager();updateNoOBWeekBtn();}
-function navWeek(dir){weekOffset+=dir;renderAll();updateNoOBWeekBtn();updateCompanyHolidayBtn();updateExtTTBtn();}
+function navWeek(dir){weekOffset+=dir;renderAll();updateNoOBWeekBtn();updateCompanyHolidayBtn();updateExtOBBtn();}
 
 function renderAgent(){
   const aDateStr=toISO(dateOfDay(aDay,weekOffset));
@@ -2729,6 +2729,18 @@ function resetSchedule(){
   noOB={};noPT={};noHoliday={};ooo={};schedOverrides={};friOverrides={1:{},2:{},3:{}};
   AGENTS.forEach(a=>{ooo[a]={};schedOverrides[a]={};[1,2,3].forEach(fw=>{friOverrides[fw][a]={};});});
   save();renderAll();
+}
+
+function resetOverridesOnly(){
+  if(!confirm('Clear all schedule overrides and reset to the new base schedule?\n\nThis will remove any custom edits but keep OOO, No OB, No PT, and holiday settings.\n\nThis cannot be undone.'))return;
+  schedOverrides={};
+  friOverrides={1:{},2:{},3:{}};
+  AGENTS.forEach(a=>{
+    schedOverrides[a]={};
+    [1,2,3].forEach(fw=>{friOverrides[fw][a]={};});
+  });
+  save();renderAll();
+  alert('✓ All schedule overrides cleared. Schedules now show the updated base with 30-min OB.');
 }
 const MANAGER_PIN='0097';
 let managerUnlocked=false;
@@ -5166,7 +5178,7 @@ function renderAll(){
   try{updateReqBadge();}catch(e){}
   try{updateNoOBWeekBtn();}catch(e){}
   try{updateCompanyHolidayBtn();}catch(e){}
-  try{updateExtTTBtn();}catch(e){}
+  try{updateExtOBBtn();}catch(e){}
 }
 
 // ── Copy from previous week ───────────────────────────────────
