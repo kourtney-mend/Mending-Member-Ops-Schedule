@@ -2739,8 +2739,20 @@ function resetOverridesOnly(){
     schedOverrides[a]={};
     [1,2,3].forEach(fw=>{friOverrides[fw][a]={};});
   });
-  save();renderAll();
-  alert('✓ All schedule overrides cleared. Schedules now show the updated base with 30-min OB.');
+  // Save locally
+  localStorage.setItem(SOK,JSON.stringify(schedOverrides));
+  localStorage.setItem(FOK,JSON.stringify(friOverrides));
+  // Block pulls so GitHub can't bring old overrides back
+  _ghPullBlocked=true;
+  // Push immediately — don't wait for debounce
+  pushToGitHub(false).then(ok=>{
+    _ghPullBlocked=false;
+    renderAll();
+    alert(ok
+      ? '✓ Reset complete. Base schedule with 30-min OB is now live for everyone.'
+      : '✓ Reset locally. Go to GitHub sync → Push now to update for your team.');
+  });
+  renderAll();
 }
 const MANAGER_PIN='0097';
 let managerUnlocked=false;
