@@ -1279,6 +1279,40 @@ function save(){
     },2000);
   }
 }
+function trimOBToBase(){
+  // Automatically trim any saved OB overrides longer than base — self-healing
+  let anyChanged=false;
+  AGENTS.forEach(a=>{
+    Object.keys(schedOverrides[a]||{}).forEach(dateStr=>{
+      const blocks=schedOverrides[a][dateStr];
+      if(!blocks) return;
+      const d=new Date(dateStr+'T12:00:00');
+      const dayName=d.toLocaleDateString('en-US',{weekday:'long'});
+      const baseBlocks=BASE[a]&&BASE[a][dayName]?BASE[a][dayName]:[];
+      const baseOB=baseBlocks.find(b=>b[0]==='Outbound');
+      const baseDur=baseOB?(t2m(baseOB[2])-t2m(baseOB[1])):30;
+      let changed=false;
+      blocks.forEach(b=>{
+        if(b[0]==='Outbound'&&(t2m(b[2])-t2m(b[1]))>baseDur){
+          b[2]=m2t(t2m(b[1])+baseDur);
+          changed=true;
+        }
+      });
+      if(changed){
+        schedOverrides[a][dateStr]=fillGapsWithOnPhones(
+          blocks.filter(b=>t2m(b[2])>t2m(b[1])).sort((x,y)=>t2m(x[1])-t2m(y[1]))
+        );
+        anyChanged=true;
+      }
+    });
+  });
+  if(anyChanged){
+    // Save to localStorage and push to GitHub so it sticks
+    localStorage.setItem(SOK,JSON.stringify(schedOverrides));
+    if(ghToken) pushToGitHub(true);
+  }
+}
+
 function load(){
   // Load base schedule from localStorage first (instant)
   try{
@@ -1298,16 +1332,14 @@ function load(){
     if(iob) indefiniteNoOB=JSON.parse(iob);
     if(ipt) indefiniteNoPT=JSON.parse(ipt);
   }catch(e){}
+  trimOBToBase();
   renderAll();
-  // If GitHub is configured, pull latest overrides in background
-  // Only needs username + repo — no token required for reading
   if(ghUser&&ghRepo){
     setSS('loading');
-    // 5 second max — if pull fails or hangs, app still loads
     const pullTimeout=setTimeout(()=>setSS('saved'),5000);
     pullFromGitHub().then(ok=>{
       clearTimeout(pullTimeout);
-      try{if(ok){renderAll();updateReqBadge();}}catch(e){}
+      try{if(ok){trimOBToBase();renderAll();updateReqBadge();}}catch(e){}
       setSS('saved');
     }).catch(()=>{clearTimeout(pullTimeout);setSS('saved');});
   } else {
@@ -2251,9 +2283,24 @@ function applyNoActivity(){
     const todayStr=toISO(new Date());
     if(isOB){
       indefiniteNoOB=false;
-      // Only clear from today forward — preserve past entries
       Object.keys(noOB).forEach(ds=>{
         if(ds>=todayStr) AGENTS.forEach(a=>{if(noOB[ds])noOB[ds][a]=false;});
+      });
+      // Also trim any OB overrides longer than 30 min back to 30 min
+      const days=['Monday','Tuesday','Wednesday','Thursday','Friday'];
+      Object.keys(schedOverrides).forEach(agent=>{
+        Object.keys(schedOverrides[agent]||{}).forEach(dateStr=>{
+          const blocks=schedOverrides[agent][dateStr];
+          if(!blocks) return;
+          let changed=false;
+          blocks.forEach(b=>{
+            if(b[0]==='Outbound'){
+              const dur=t2m(b[2])-t2m(b[1]);
+              if(dur>30){b[2]=m2t(t2m(b[1])+30);changed=true;}
+            }
+          });
+          if(changed) schedOverrides[agent][dateStr]=fillGapsWithOnPhones(blocks.filter(b=>t2m(b[2])>t2m(b[1])).sort((a,x)=>t2m(a[1])-t2m(x[1])));
+        });
       });
     } else {
       indefiniteNoPT=false;
@@ -2312,11 +2359,15 @@ function toggleExtendOB(){
   const dateStr=toISO(dateOfDay(mDay,weekOffset));
   const fw=mDay==='Friday'?mFW:1;
 
-  // Check if OB is already extended (OB block is 60min) for all agents
+  // Check if OB is already extended (>30 min) for all agents on this day
   const allExtended=AGENTS.every(a=>{
     const blocks=getRawBlocks(a,mDay,fw,dateStr);
     const ob=blocks.find(b=>b[0]==='Outbound');
-    return ob&&(t2m(ob[2])-t2m(ob[1]))>=60;
+    // Compare against base — if OB is longer than base OB, it's extended
+    const baseBlocks=BASE[a]&&BASE[a][mDay]?BASE[a][mDay]:[];
+    const baseOB=baseBlocks.find(b=>b[0]==='Outbound');
+    const baseDur=baseOB?(t2m(baseOB[2])-t2m(baseOB[1])):30;
+    return ob&&(t2m(ob[2])-t2m(ob[1]))>baseDur;
   });
 
   AGENTS.forEach(a=>{
@@ -2324,12 +2375,17 @@ function toggleExtendOB(){
     const obIdx=blocks.findIndex(b=>b[0]==='Outbound');
     if(obIdx===-1) return;
 
+    // Get base OB duration for this agent/day
+    const baseBlocks=BASE[a]&&BASE[a][mDay]?BASE[a][mDay]:[];
+    const baseOB=baseBlocks.find(b=>b[0]==='Outbound');
+    const baseDur=baseOB?(t2m(baseOB[2])-t2m(baseOB[1])):30;
+
     if(allExtended){
-      // Revert — trim OB back to 30 min, fill gap with On Phones
+      // Revert to base OB duration
       const obStart=t2m(blocks[obIdx][1]);
-      blocks[obIdx][2]=m2t(obStart+30);
+      blocks[obIdx][2]=m2t(obStart+baseDur);
     } else {
-      // Extend OB by 30 min — push end time forward
+      // Extend OB by 30 min
       const obEnd=t2m(blocks[obIdx][2]);
       blocks[obIdx][2]=m2t(obEnd+30);
     }
@@ -2357,10 +2413,18 @@ function updateExtOBBtn(){
   if(!btn) return;
   const dateStr=toISO(dateOfDay(mDay,weekOffset));
   const fw=mDay==='Friday'?mFW:1;
+  // Only show as extended if there's an explicit override AND OB is longer than base
   const allExtended=AGENTS.every(a=>{
+    const hasOverride=mDay==='Friday'
+      ?!!(friOverrides[fw]&&friOverrides[fw][a]&&friOverrides[fw][a][dateStr])
+      :!!(schedOverrides[a]&&schedOverrides[a][dateStr]);
+    if(!hasOverride) return false; // no override = base schedule = not extended
     const blocks=getRawBlocks(a,mDay,fw,dateStr);
     const ob=blocks.find(b=>b[0]==='Outbound');
-    return ob&&(t2m(ob[2])-t2m(ob[1]))>=60;
+    const baseBlocks=BASE[a]&&BASE[a][mDay]?BASE[a][mDay]:[];
+    const baseOB=baseBlocks.find(b=>b[0]==='Outbound');
+    const baseDur=baseOB?(t2m(baseOB[2])-t2m(baseOB[1])):30;
+    return ob&&(t2m(ob[2])-t2m(ob[1]))>baseDur;
   });
   if(allExtended){
     btn.textContent='✓ OB Extended — click to restore';
