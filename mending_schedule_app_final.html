@@ -929,22 +929,22 @@ function m2d(m){m=((m%1440)+1440)%1440;const h=Math.floor(m/60),mn=m%60,ap=h>=12
 
 const BASE={
   Ebony:{
-    Monday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['Outbound','10:00','11:00'],['Break 1','11:00','11:15'],['On Phones','11:15','13:15'],['Break 2','13:15','13:30'],['On Phones','13:30','15:00'],['Lunch','15:00','15:30'],['On Phones','15:30','16:00'],['Weekly Sync','16:00','16:30'],['On Phones','16:30','17:00']],
-    Tuesday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['Outbound','10:00','11:00'],['Break 1','11:00','11:15'],['On Phones','11:15','13:15'],['Break 2','13:15','13:30'],['Project Time','13:30','14:30'],['On Phones','14:30','15:00'],['Lunch','15:00','15:30'],['On Phones','15:30','17:00']],
-    Wednesday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['Outbound','10:00','11:00'],['Break 1','11:00','11:15'],['On Phones','11:15','12:00'],['1:1','12:00','12:30'],['On Phones','12:30','13:15'],['Break 2','13:15','13:30'],['On Phones','13:30','15:00'],['Lunch','15:00','15:30'],['On Phones','15:30','17:00']],
-    Thursday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['Outbound','10:00','11:00'],['Break 1','11:00','11:15'],['On Phones','11:15','13:15'],['Break 2','13:15','13:30'],['On Phones','13:30','15:00'],['Lunch','15:00','15:30'],['On Phones','15:30','17:00']],
+    Monday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['Outbound','10:00','10:30'],['On Phones','10:30','11:00'],['Break 1','11:00','11:15'],['On Phones','11:15','13:15'],['Break 2','13:15','13:30'],['On Phones','13:30','15:00'],['Lunch','15:00','15:30'],['On Phones','15:30','16:00'],['Weekly Sync','16:00','16:30'],['On Phones','16:30','17:00']],
+    Tuesday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['Outbound','10:00','10:30'],['On Phones','10:30','11:00'],['Break 1','11:00','11:15'],['On Phones','11:15','13:15'],['Break 2','13:15','13:30'],['Project Time','13:30','14:30'],['On Phones','14:30','15:00'],['Lunch','15:00','15:30'],['On Phones','15:30','17:00']],
+    Wednesday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['Outbound','10:00','10:30'],['On Phones','10:30','11:00'],['Break 1','11:00','11:15'],['On Phones','11:15','12:00'],['1:1','12:00','12:30'],['On Phones','12:30','13:15'],['Break 2','13:15','13:30'],['On Phones','13:30','15:00'],['Lunch','15:00','15:30'],['On Phones','15:30','17:00']],
+    Thursday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['Outbound','10:00','10:30'],['On Phones','10:30','11:00'],['Break 1','11:00','11:15'],['On Phones','11:15','13:15'],['Break 2','13:15','13:30'],['On Phones','13:30','15:00'],['Lunch','15:00','15:30'],['On Phones','15:30','17:00']],
   },
   Marisa:{
-    Monday:[['On Phones','08:30','09:00'],['Ticket Time','09:00','09:30'],['On Phones','09:30','10:45'],['Break 1','10:45','11:00'],['On Phones','11:00','13:15'],['Break 2','13:15','13:30'],['Lunch','13:30','14:00'],['Outbound','14:00','15:00'],['Weekly Sync','15:00','15:30'],['On Phones','15:30','16:30']],
-    Tuesday:[['On Phones','08:30','09:00'],['Ticket Time','09:00','09:30'],['On Phones','09:30','10:45'],['Break 1','10:45','11:00'],['On Phones','11:00','13:30'],['1:1','13:30','14:00'],['On Phones','14:00','14:15'],['Lunch','14:15','14:45'],['Break 2','14:45','15:00'],['Outbound','15:00','16:00'],['On Phones','16:00','16:30']],
-    Wednesday:[['On Phones','08:30','09:00'],['Ticket Time','09:00','09:30'],['On Phones','09:30','10:45'],['Break 1','10:45','11:00'],['On Phones','11:00','14:15'],['Break 2','14:15','14:30'],['Lunch','14:30','15:00'],['Outbound','15:00','16:00'],['On Phones','16:00','16:30']],
-    Thursday:[['On Phones','08:30','09:00'],['Ticket Time','09:00','09:30'],['On Phones','09:30','10:45'],['Break 1','10:45','11:00'],['On Phones','11:00','13:00'],['Project Time','13:00','14:00'],['Lunch','14:00','14:30'],['Break 2','14:30','14:45'],['On Phones','14:45','15:00'],['Outbound','15:00','16:00'],['On Phones','16:00','16:30']],
+    Monday:[['On Phones','08:30','09:00'],['Ticket Time','09:00','09:30'],['On Phones','09:30','10:45'],['Break 1','10:45','11:00'],['On Phones','11:00','13:15'],['Break 2','13:15','13:30'],['Lunch','13:30','14:00'],['Outbound','14:00','14:30'],['On Phones','14:30','15:00'],['Weekly Sync','15:00','15:30'],['On Phones','15:30','16:30']],
+    Tuesday:[['On Phones','08:30','09:00'],['Ticket Time','09:00','09:30'],['On Phones','09:30','10:45'],['Break 1','10:45','11:00'],['On Phones','11:00','13:30'],['1:1','13:30','14:00'],['On Phones','14:00','14:15'],['Lunch','14:15','14:45'],['Break 2','14:45','15:00'],['Outbound','15:00','15:30'],['On Phones','15:30','16:30']],
+    Wednesday:[['On Phones','08:30','09:00'],['Ticket Time','09:00','09:30'],['On Phones','09:30','10:45'],['Break 1','10:45','11:00'],['On Phones','11:00','14:15'],['Break 2','14:15','14:30'],['Lunch','14:30','15:00'],['Outbound','15:00','15:30'],['On Phones','15:30','16:30']],
+    Thursday:[['On Phones','08:30','09:00'],['Ticket Time','09:00','09:30'],['On Phones','09:30','10:45'],['Break 1','10:45','11:00'],['On Phones','11:00','13:00'],['Project Time','13:00','14:00'],['Lunch','14:00','14:30'],['Break 2','14:30','14:45'],['On Phones','14:45','15:00'],['Outbound','15:00','15:30'],['On Phones','15:30','16:30']],
   },
   Ky:{
-    Monday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['On Phones','10:00','11:30'],['Lunch','11:30','12:00'],['Break 1','12:00','12:15'],['On Phones','12:15','14:45'],['Break 2','14:45','15:00'],['Weekly Sync','15:00','15:30'],['Outbound','15:30','16:30'],['On Phones','16:30','17:00']],
-    Tuesday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['On Phones','10:00','11:30'],['Lunch','11:30','12:00'],['Break 1','12:00','12:15'],['On Phones','12:15','15:00'],['Break 2','15:00','15:15'],['Outbound','15:15','16:15'],['On Phones','16:15','17:00']],
-    Wednesday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['On Phones','10:00','11:30'],['Lunch','11:30','12:00'],['Break 1','12:00','12:15'],['Project Time','12:15','13:15'],['On Phones','13:15','15:00'],['Break 2','15:00','15:15'],['Outbound','15:15','16:15'],['On Phones','16:15','17:00']],
-    Thursday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['On Phones','10:00','11:30'],['Lunch','11:30','12:00'],['Break 1','12:00','12:15'],['On Phones','12:15','12:30'],['1:1','12:30','13:00'],['On Phones','13:00','15:00'],['Break 2','15:00','15:15'],['Outbound','15:15','16:15'],['On Phones','16:15','17:00']],
+    Monday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['On Phones','10:00','11:30'],['Lunch','11:30','12:00'],['Break 1','12:00','12:15'],['On Phones','12:15','14:45'],['Break 2','14:45','15:00'],['Weekly Sync','15:00','15:30'],['Outbound','15:30','16:00'],['On Phones','16:00','17:00']],
+    Tuesday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['On Phones','10:00','11:30'],['Lunch','11:30','12:00'],['Break 1','12:00','12:15'],['On Phones','12:15','15:00'],['Break 2','15:00','15:15'],['Outbound','15:15','15:45'],['On Phones','15:45','17:00']],
+    Wednesday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['On Phones','10:00','11:30'],['Lunch','11:30','12:00'],['Break 1','12:00','12:15'],['Project Time','12:15','13:15'],['On Phones','13:15','15:00'],['Break 2','15:00','15:15'],['Outbound','15:15','15:45'],['On Phones','15:45','17:00']],
+    Thursday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['On Phones','10:00','11:30'],['Lunch','11:30','12:00'],['Break 1','12:00','12:15'],['On Phones','12:15','12:30'],['1:1','12:30','13:00'],['On Phones','13:00','15:00'],['Break 2','15:00','15:15'],['Outbound','15:15','15:45'],['On Phones','15:45','17:00']],
   }
 };
 const BF={1:{Ebony:[['On Phones','09:00','11:00'],['Break 1','11:00','11:15'],['On Phones','11:15','13:15'],['Break 2','13:15','13:30'],['Lunch','13:30','14:00'],['On Phones','14:00','15:00'],['All Hands','15:00','15:45'],['On Phones','15:45','16:00'],['Ticket Time','16:00','17:00']],Marisa:[['Ticket Time','08:30','09:00'],['On Phones','09:00','10:15'],['Break 1','10:15','10:30'],['On Phones','10:30','13:15'],['Break 2','13:15','13:30'],['On Phones','13:30','14:45'],['Lunch','14:45','15:15'],['On Phones','15:15','16:00'],['Ticket Time','16:00','16:30']],Ky:[['Ticket Time','09:00','10:00'],['On Phones','10:00','11:30'],['Lunch','11:30','12:00'],['Break 1','12:00','12:15'],['On Phones','12:15','15:15'],['Break 2','15:15','15:30'],['On Phones','15:30','17:00']]},2:{Ebony:[['On Phones','09:00','11:00'],['Break 1','11:00','11:15'],['On Phones','11:15','13:15'],['Break 2','13:15','13:30'],['Lunch','13:30','14:00'],['On Phones','14:00','16:00'],['Ticket Time','16:00','17:00']],Marisa:[['Ticket Time','08:30','09:00'],['On Phones','09:00','10:15'],['Break 1','10:15','10:30'],['On Phones','10:30','13:15'],['Break 2','13:15','13:30'],['On Phones','13:30','14:00'],['All Hands','14:00','14:45'],['Lunch','14:45','15:15'],['On Phones','15:15','16:00'],['Ticket Time','16:00','16:30']],Ky:[['Ticket Time','09:00','10:00'],['On Phones','10:00','11:30'],['Lunch','11:30','12:00'],['Break 1','12:00','12:15'],['On Phones','12:15','15:15'],['Break 2','15:15','15:30'],['On Phones','15:30','17:00']]},3:{Ebony:[['On Phones','09:00','11:00'],['Break 1','11:00','11:15'],['On Phones','11:15','13:15'],['Break 2','13:15','13:30'],['Lunch','13:30','14:00'],['On Phones','14:00','16:00'],['Ticket Time','16:00','17:00']],Marisa:[['Ticket Time','08:30','09:00'],['On Phones','09:00','10:15'],['Break 1','10:15','10:30'],['On Phones','10:30','13:15'],['Break 2','13:15','13:30'],['On Phones','13:30','14:45'],['Lunch','14:45','15:15'],['On Phones','15:15','16:00'],['Ticket Time','16:00','16:30']],Ky:[['Ticket Time','09:00','10:00'],['On Phones','10:00','11:30'],['Lunch','11:30','12:00'],['Break 1','12:00','12:15'],['On Phones','12:15','14:00'],['All Hands','14:00','14:45'],['On Phones','14:45','15:15'],['Break 2','15:15','15:30'],['On Phones','15:30','17:00']]}};
@@ -2305,71 +2305,35 @@ function toggleExtendedTicketTime(){
   if(!managerUnlocked){requirePIN('manager',()=>toggleExtendedTicketTime());return;}
   const dateStr=toISO(dateOfDay(mDay,weekOffset));
   const fw=mDay==='Friday'?mFW:1;
-  const EXTEND_BY=15; // minutes
 
-  // Check current state — has TT already been extended for all agents today?
+  // Check current state — has extra TT already been added after OB for all agents?
   const allExtended=AGENTS.every(a=>{
     const blocks=getRawBlocks(a,mDay,fw,dateStr);
-    const tt=blocks.find(b=>b[0]==='Ticket Time');
-    return tt&&(t2m(tt[2])-t2m(tt[1]))>30;
+    const obIdx=blocks.findIndex(b=>b[0]==='Outbound');
+    if(obIdx===-1) return false;
+    const afterOB=blocks[obIdx+1];
+    return afterOB&&afterOB[0]==='Ticket Time';
   });
 
   AGENTS.forEach(a=>{
     const blocks=JSON.parse(JSON.stringify(getRawBlocks(a,mDay,fw,dateStr)));
-    const ttIdx=blocks.findIndex(b=>b[0]==='Ticket Time');
-    if(ttIdx===-1) return; // no ticket time for this agent today
+    const obIdx=blocks.findIndex(b=>b[0]==='Outbound');
+    if(obIdx===-1) return;
 
-    const tt=blocks[ttIdx];
-    const ttStart=t2m(tt[1]);
-    const ttEnd=t2m(tt[2]);
-    const ttDur=ttEnd-ttStart;
+    const obEnd=t2m(blocks[obIdx][2]);
 
     if(allExtended){
-      // Revert — shrink TT back by 15 min and shift following blocks back
-      const newEnd=ttEnd-EXTEND_BY;
-      blocks[ttIdx][2]=m2t(newEnd);
-      // Shift all subsequent blocks back by 15 min
-      for(let i=ttIdx+1;i<blocks.length;i++){
-        const bs=t2m(blocks[i][1]),be=t2m(blocks[i][2]);
-        // Only shift if block starts exactly at or after old TT end
-        if(bs>=ttEnd-EXTEND_BY){
-          blocks[i][1]=m2t(bs-EXTEND_BY);
-          blocks[i][2]=m2t(be-EXTEND_BY);
-        }
+      // Remove the extra TT block after OB
+      if(blocks[obIdx+1]&&blocks[obIdx+1][0]==='Ticket Time'){
+        blocks.splice(obIdx+1,1);
       }
     } else {
-      // Extend TT by 15 min
-      const newEnd=ttEnd+EXTEND_BY;
-      blocks[ttIdx][2]=m2t(newEnd);
-
-      // Handle the next block
-      if(ttIdx+1<blocks.length){
-        const next=blocks[ttIdx+1];
-        const nextStart=t2m(next[1]);
-
-        if(nextStart===ttEnd){
-          // Next block starts exactly where TT ended
-          if(next[0]==='On Phones'){
-            // Trim On Phones — absorbs the extension
-            const nextEnd=t2m(next[2]);
-            if(nextEnd<=newEnd){
-              // On Phones fully consumed — remove it
-              blocks.splice(ttIdx+1,1);
-            } else {
-              blocks[ttIdx+1][1]=m2t(newEnd);
-            }
-          } else {
-            // Protected block (Break, Lunch, etc.) — shift it and everything after forward
-            for(let i=ttIdx+1;i<blocks.length;i++){
-              blocks[i][1]=m2t(t2m(blocks[i][1])+EXTEND_BY);
-              blocks[i][2]=m2t(t2m(blocks[i][2])+EXTEND_BY);
-            }
-          }
-        }
-      }
+      // Insert 30min Ticket Time right after OB
+      const ttStart=m2t(obEnd);
+      const ttEnd=m2t(obEnd+30);
+      blocks.splice(obIdx+1,0,['Ticket Time',ttStart,ttEnd]);
     }
 
-    // Clean up zero-length blocks and re-run gap fill
     const clean=fillGapsWithOnPhones(
       blocks.filter(b=>t2m(b[2])>t2m(b[1])).sort((x,y)=>t2m(x[1])-t2m(y[1]))
     );
@@ -2395,8 +2359,9 @@ function updateExtTTBtn(){
   const fw=mDay==='Friday'?mFW:1;
   const allExtended=AGENTS.every(a=>{
     const blocks=getRawBlocks(a,mDay,fw,dateStr);
-    const tt=blocks.find(b=>b[0]==='Ticket Time');
-    return tt&&(t2m(tt[2])-t2m(tt[1]))>30;
+    const obIdx=blocks.findIndex(b=>b[0]==='Outbound');
+    if(obIdx===-1) return false;
+    return blocks[obIdx+1]&&blocks[obIdx+1][0]==='Ticket Time';
   });
   if(allExtended){
     btn.textContent='✓ Extended TT — click to restore';
