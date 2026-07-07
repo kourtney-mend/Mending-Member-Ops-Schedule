@@ -243,7 +243,34 @@
     "Marisa": {},
     "Ky": {}
   },
-  "requests": [],
+  "requests": [
+    {
+      "id": "req-1783455961444",
+      "agent": "Ebony",
+      "type": "time",
+      "date": "2026-07-08",
+      "dayOfWeek": "Monday",
+      "blocks": [],
+      "notes": "",
+      "status": "pending",
+      "submittedAt": "2026-07-07T20:26:01.444Z",
+      "resolvedAt": null,
+      "managerNote": "",
+      "timeAct": "Outbound",
+      "timeMinutes": 30,
+      "timeFreq": "once",
+      "approvedMinutes": null,
+      "elLeaveTime": null,
+      "elHours": 0,
+      "elActivity": null,
+      "elMakeup": [],
+      "elMakeupStatus": {},
+      "shiftNewStart": null,
+      "shiftNewEnd": null,
+      "shadowtoStart": null,
+      "shadowtoEnd": null
+    }
+  ],
   "_managerWebhook": "",
-  "_saved": "2026-07-07T14:41:03.342Z"
+  "_saved": "2026-07-07T20:26:03.491Z"
 }
