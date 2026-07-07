@@ -127,7 +127,11 @@
     }
   },
   "noOB": {},
-  "noPT": {},
+  "noPT": {
+    "2026-07-07": {
+      "Ebony": true
+    }
+  },
   "noHoliday": {},
   "ooo": {
     "Ebony": {},
@@ -136,5 +140,5 @@
   },
   "requests": [],
   "_managerWebhook": "",
-  "_saved": "2026-07-07T14:37:59.458Z"
+  "_saved": "2026-07-07T14:40:27.103Z"
 }
