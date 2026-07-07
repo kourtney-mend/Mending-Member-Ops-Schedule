@@ -252,14 +252,14 @@
       "dayOfWeek": "Monday",
       "blocks": [],
       "notes": "",
-      "status": "pending",
+      "status": "approved",
       "submittedAt": "2026-07-07T20:26:01.444Z",
-      "resolvedAt": null,
+      "resolvedAt": "2026-07-07T20:26:18.892Z",
       "managerNote": "",
       "timeAct": "Outbound",
       "timeMinutes": 30,
       "timeFreq": "once",
-      "approvedMinutes": null,
+      "approvedMinutes": 30,
       "elLeaveTime": null,
       "elHours": 0,
       "elActivity": null,
@@ -272,5 +272,5 @@
     }
   ],
   "_managerWebhook": "",
-  "_saved": "2026-07-07T20:26:03.491Z"
+  "_saved": "2026-07-07T20:26:20.626Z"
 }
