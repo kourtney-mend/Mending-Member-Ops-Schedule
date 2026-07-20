@@ -618,14 +618,17 @@ select, input[type=time] { width: 100%; font-size: 13px; padding: 7px 9px; borde
     <!-- Move all agents panel -->
     <div id="bam-move-all-panel" style="display:none">
       <div style="background:#E6F1FB;border:0.5px solid #B5D4F4;border-radius:var(--radius-md);padding:10px 12px;margin-bottom:1rem;font-size:13px;color:#0C447C">
-        Moving <strong id="bam-move-all-act">Weekly Sync</strong> for <strong>all agents</strong> on this day to the new time.
+        Moving <strong id="bam-move-all-act">Weekly Sync</strong> for <strong>all agents</strong> — pick a new day and time.
+      </div>
+      <div class="form-row">
+        <div><label>Move to date</label><input type="date" id="bam-all-date" oninput="bamUpdateAllPreview()"></div>
       </div>
       <div class="form-row">
         <div><label>New start time</label><input type="time" id="bam-all-start" oninput="bamUpdateAllPreview()"></div>
         <div><label>New end time</label><input type="time" id="bam-all-end" oninput="bamUpdateAllPreview()"></div>
       </div>
-      <div id="bam-all-cov" style="margin-bottom:12px"></div>
       <div id="bam-all-agents" style="margin-bottom:12px;font-size:12px;color:var(--text-secondary)"></div>
+      <div id="bam-all-cov" style="margin-bottom:12px"></div>
       <div class="btn-row">
         <button class="bp" onclick="bamConfirmMoveAll()">Move for all agents</button>
         <button class="bs" onclick="bamShowEdit()">Back</button>
@@ -928,22 +931,22 @@ function m2d(m){m=((m%1440)+1440)%1440;const h=Math.floor(m/60),mn=m%60,ap=h>=12
 
 const BASE={
   Ebony:{
-    Monday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['Outbound','10:00','10:30'],['On Phones','10:30','11:00'],['Break 1','11:00','11:15'],['On Phones','11:15','13:15'],['Break 2','13:15','13:30'],['On Phones','13:30','15:00'],['Lunch','15:00','15:30'],['On Phones','15:30','16:00'],['Weekly Sync','16:00','16:30'],['On Phones','16:30','17:00']],
-    Tuesday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['Outbound','10:00','10:30'],['On Phones','10:30','11:00'],['Break 1','11:00','11:15'],['On Phones','11:15','13:15'],['Break 2','13:15','13:30'],['On Phones','13:30','15:00'],['Lunch','15:00','15:30'],['On Phones','15:30','17:00']],
-    Wednesday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['Outbound','10:00','10:30'],['On Phones','10:30','11:00'],['Break 1','11:00','11:15'],['On Phones','11:15','12:00'],['1:1','12:00','12:30'],['On Phones','12:30','13:15'],['Break 2','13:15','13:30'],['On Phones','13:30','15:00'],['Lunch','15:00','15:30'],['On Phones','15:30','17:00']],
-    Thursday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['Outbound','10:00','10:30'],['On Phones','10:30','11:00'],['Break 1','11:00','11:15'],['On Phones','11:15','13:15'],['Break 2','13:15','13:30'],['On Phones','13:30','15:00'],['Lunch','15:00','15:30'],['On Phones','15:30','17:00']],
+    Monday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['Outbound','10:00','11:00'],['Break 1','11:00','11:15'],['On Phones','11:15','13:15'],['Break 2','13:15','13:30'],['On Phones','13:30','15:00'],['Lunch','15:00','15:30'],['On Phones','15:30','16:00'],['Weekly Sync','16:00','16:30'],['On Phones','16:30','17:00']],
+    Tuesday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['Outbound','10:00','11:00'],['Break 1','11:00','11:15'],['On Phones','11:15','13:15'],['Break 2','13:15','13:30'],['On Phones','13:30','15:00'],['Lunch','15:00','15:30'],['On Phones','15:30','17:00']],
+    Wednesday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['Outbound','10:00','11:00'],['Break 1','11:00','11:15'],['On Phones','11:15','12:00'],['1:1','12:00','12:30'],['On Phones','12:30','13:15'],['Break 2','13:15','13:30'],['On Phones','13:30','15:00'],['Lunch','15:00','15:30'],['On Phones','15:30','17:00']],
+    Thursday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['Outbound','10:00','11:00'],['Break 1','11:00','11:15'],['On Phones','11:15','13:15'],['Break 2','13:15','13:30'],['On Phones','13:30','15:00'],['Lunch','15:00','15:30'],['On Phones','15:30','17:00']]
   },
   Marisa:{
-    Monday:[['On Phones','08:30','09:00'],['Ticket Time','09:00','09:30'],['On Phones','09:30','10:45'],['Break 1','10:45','11:00'],['On Phones','11:00','13:15'],['Break 2','13:15','13:30'],['Lunch','13:30','14:00'],['Outbound','14:00','14:30'],['On Phones','14:30','15:00'],['Weekly Sync','15:00','15:30'],['On Phones','15:30','16:30']],
-    Tuesday:[['On Phones','08:30','09:00'],['Ticket Time','09:00','09:30'],['On Phones','09:30','10:45'],['Break 1','10:45','11:00'],['On Phones','11:00','13:30'],['1:1','13:30','14:00'],['On Phones','14:00','14:15'],['Lunch','14:15','14:45'],['Break 2','14:45','15:00'],['Outbound','15:00','15:30'],['On Phones','15:30','16:30']],
-    Wednesday:[['On Phones','08:30','09:00'],['Ticket Time','09:00','09:30'],['On Phones','09:30','10:45'],['Break 1','10:45','11:00'],['On Phones','11:00','14:15'],['Break 2','14:15','14:30'],['Lunch','14:30','15:00'],['Outbound','15:00','15:30'],['On Phones','15:30','16:30']],
-    Thursday:[['On Phones','08:30','09:00'],['Ticket Time','09:00','09:30'],['On Phones','09:30','10:45'],['Break 1','10:45','11:00'],['On Phones','11:00','13:00'],['On Phones','13:00','14:00'],['Lunch','14:00','14:30'],['Break 2','14:30','14:45'],['On Phones','14:45','15:00'],['Outbound','15:00','15:30'],['On Phones','15:30','16:30']],
+    Monday:[['On Phones','08:30','10:45'],['Break 1','10:45','11:00'],['On Phones','11:00','11:30'],['Lunch','11:30','12:00'],['On Phones','12:00','13:00'],['Outbound','13:00','14:00'],['On Phones','14:00','14:45'],['Break 2','14:45','15:00'],['Weekly Sync','15:00','15:30'],['Ticket Time','15:30','16:00'],['On Phones','16:00','16:30']],
+    Tuesday:[['On Phones','08:30','10:45'],['Break 1','10:45','11:00'],['On Phones','11:00','11:30'],['Lunch','11:30','12:00'],['On Phones','12:00','13:00'],['Outbound','13:00','14:00'],['On Phones','14:00','14:30'],['1:1','14:30','15:00'],['Ticket Time','15:00','15:30'],['On Phones','15:30','16:30']],
+    Wednesday:[['On Phones','08:30','10:45'],['Break 1','10:45','11:00'],['On Phones','11:00','11:30'],['Lunch','11:30','12:00'],['On Phones','12:00','13:00'],['Outbound','13:00','14:00'],['On Phones','14:00','14:45'],['Break 2','14:45','15:00'],['Ticket Time','15:00','15:30'],['On Phones','15:30','16:30']],
+    Thursday:[['On Phones','08:30','10:45'],['Break 1','10:45','11:00'],['On Phones','11:00','11:30'],['Lunch','11:30','12:00'],['On Phones','12:00','13:00'],['Outbound','13:00','14:00'],['On Phones','14:00','14:45'],['Break 2','14:45','15:00'],['Ticket Time','15:00','15:30'],['On Phones','15:30','16:30']]
   },
   Ky:{
-    Monday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['On Phones','10:00','11:30'],['Lunch','11:30','12:00'],['Break 1','12:00','12:15'],['On Phones','12:15','14:45'],['Break 2','14:45','15:00'],['Weekly Sync','15:00','15:30'],['Outbound','15:30','16:00'],['On Phones','16:00','17:00']],
-    Tuesday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['On Phones','10:00','11:30'],['Lunch','11:30','12:00'],['Break 1','12:00','12:15'],['On Phones','12:15','15:00'],['Break 2','15:00','15:15'],['Outbound','15:15','15:45'],['On Phones','15:45','17:00']],
-    Wednesday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['On Phones','10:00','11:30'],['Lunch','11:30','12:00'],['Break 1','12:00','12:15'],['On Phones','12:15','15:00'],['Break 2','15:00','15:15'],['Outbound','15:15','15:45'],['On Phones','15:45','17:00']],
-    Thursday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['On Phones','10:00','11:30'],['Lunch','11:30','12:00'],['Break 1','12:00','12:15'],['On Phones','12:15','12:30'],['1:1','12:30','13:00'],['On Phones','13:00','15:00'],['Break 2','15:00','15:15'],['Outbound','15:15','15:45'],['On Phones','15:45','17:00']],
+    Monday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['On Phones','10:00','11:30'],['Lunch','11:30','12:00'],['Break 1','12:00','12:15'],['On Phones','12:15','14:45'],['Break 2','14:45','15:00'],['Weekly Sync','15:00','15:30'],['Outbound','15:30','16:30'],['On Phones','16:30','17:00']],
+    Tuesday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['On Phones','10:00','11:30'],['Lunch','11:30','12:00'],['Break 1','12:00','12:15'],['On Phones','12:15','15:00'],['Break 2','15:00','15:15'],['Outbound','15:15','16:15'],['On Phones','16:15','17:00']],
+    Wednesday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['On Phones','10:00','11:30'],['Lunch','11:30','12:00'],['Break 1','12:00','12:15'],['On Phones','12:15','15:00'],['Break 2','15:00','15:15'],['Outbound','15:15','16:15'],['On Phones','16:15','17:00']],
+    Thursday:[['On Phones','09:00','09:30'],['Ticket Time','09:30','10:00'],['On Phones','10:00','11:30'],['Lunch','11:30','12:00'],['Break 1','12:00','12:15'],['On Phones','12:15','12:30'],['1:1','12:30','13:00'],['On Phones','13:00','15:00'],['Break 2','15:00','15:15'],['Outbound','15:15','16:15'],['On Phones','16:15','17:00']]
   }
 };
 const BF={1:{Ebony:[['On Phones','09:00','11:00'],['Break 1','11:00','11:15'],['On Phones','11:15','13:15'],['Break 2','13:15','13:30'],['Lunch','13:30','14:00'],['On Phones','14:00','15:00'],['All Hands','15:00','15:45'],['On Phones','15:45','16:00'],['Ticket Time','16:00','17:00']],Marisa:[['Ticket Time','08:30','09:00'],['On Phones','09:00','10:15'],['Break 1','10:15','10:30'],['On Phones','10:30','13:15'],['Break 2','13:15','13:30'],['On Phones','13:30','14:45'],['Lunch','14:45','15:15'],['On Phones','15:15','16:00'],['Ticket Time','16:00','16:30']],Ky:[['Ticket Time','09:00','10:00'],['On Phones','10:00','11:30'],['Lunch','11:30','12:00'],['Break 1','12:00','12:15'],['On Phones','12:15','15:15'],['Break 2','15:15','15:30'],['On Phones','15:30','17:00']]},2:{Ebony:[['On Phones','09:00','11:00'],['Break 1','11:00','11:15'],['On Phones','11:15','13:15'],['Break 2','13:15','13:30'],['Lunch','13:30','14:00'],['On Phones','14:00','16:00'],['Ticket Time','16:00','17:00']],Marisa:[['Ticket Time','08:30','09:00'],['On Phones','09:00','10:15'],['Break 1','10:15','10:30'],['On Phones','10:30','13:15'],['Break 2','13:15','13:30'],['On Phones','13:30','14:00'],['All Hands','14:00','14:45'],['Lunch','14:45','15:15'],['On Phones','15:15','16:00'],['Ticket Time','16:00','16:30']],Ky:[['Ticket Time','09:00','10:00'],['On Phones','10:00','11:30'],['Lunch','11:30','12:00'],['Break 1','12:00','12:15'],['On Phones','12:15','15:15'],['Break 2','15:15','15:30'],['On Phones','15:30','17:00']]},3:{Ebony:[['On Phones','09:00','11:00'],['Break 1','11:00','11:15'],['On Phones','11:15','13:15'],['Break 2','13:15','13:30'],['Lunch','13:30','14:00'],['On Phones','14:00','16:00'],['Ticket Time','16:00','17:00']],Marisa:[['Ticket Time','08:30','09:00'],['On Phones','09:00','10:15'],['Break 1','10:15','10:30'],['On Phones','10:30','13:15'],['Break 2','13:15','13:30'],['On Phones','13:30','14:45'],['Lunch','14:45','15:15'],['On Phones','15:15','16:00'],['Ticket Time','16:00','16:30']],Ky:[['Ticket Time','09:00','10:00'],['On Phones','10:00','11:30'],['Lunch','11:30','12:00'],['Break 1','12:00','12:15'],['On Phones','12:15','14:00'],['All Hands','14:00','14:45'],['On Phones','14:45','15:15'],['Break 2','15:15','15:30'],['On Phones','15:30','17:00']]}};
@@ -1330,14 +1333,13 @@ function load(){
     if(iob) indefiniteNoOB=JSON.parse(iob);
     if(ipt) indefiniteNoPT=JSON.parse(ipt);
   }catch(e){}
-  trimOBToBase();
   renderAll();
   if(ghUser&&ghRepo){
     setSS('loading');
     const pullTimeout=setTimeout(()=>setSS('saved'),5000);
     pullFromGitHub().then(ok=>{
       clearTimeout(pullTimeout);
-      try{if(ok){trimOBToBase();renderAll();updateReqBadge();}}catch(e){}
+      try{if(ok){renderAll();updateReqBadge();}}catch(e){}
       setSS('saved');
     }).catch(()=>{clearTimeout(pullTimeout);setSS('saved');});
   } else {
@@ -1456,33 +1458,6 @@ function applyOOO(){
         :!!(schedOverrides[a]&&schedOverrides[a][dateStr]);
       return !hasOverride;
     });
-
-    if(otherWorking.length){
-      const names=otherWorking.join(' and ');
-      const simplify=confirm(`${agent} is marked OOO on ${new Date(dateStr+'T12:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})}.\n\nSimplify ${names}'s schedule to inbound-only coverage?\n\nOK = simplify all  |  Cancel = keep schedules as-is`);
-      if(simplify){
-        // Apply coverage to all other working agents at once
-        const d=new Date(dateStr+'T12:00:00');
-        const dayN=d.toLocaleDateString('en-US',{weekday:'long'});
-        const savedWO=weekOffset;
-        for(let wo=-52;wo<=52;wo++){if(toISO(dateOfDay(dayN,wo))===dateStr){weekOffset=wo;break;}}
-        const fw2=dayN==='Friday'?getFriWeekForDate(d):1;
-        otherWorking.forEach(a=>{
-          const blocks=getRawBlocks(a,dayN,fw2,dateStr);
-          const simplified=applyOOOCoverage(blocks);
-          if(dayN==='Friday'){
-            if(!friOverrides[fw2]) friOverrides[fw2]={};
-            if(!friOverrides[fw2][a]) friOverrides[fw2][a]={};
-            friOverrides[fw2][a][dateStr]=simplified;
-          } else {
-            if(!schedOverrides[a]) schedOverrides[a]={};
-            schedOverrides[a][dateStr]=simplified;
-          }
-        });
-        weekOffset=savedWO;
-        save();
-      }
-    }
 
     renderAll();
     closeOooModal();
@@ -1656,18 +1631,6 @@ function gBlocks(agent,day,fw,tS,tF){
   } else {
     blocks=getRawBlocks(agent,day,fw);
   }
-
-  // Always cap OB at base duration — prevents old overrides showing 60-min OB
-  const baseBlocks=BASE[agent]&&BASE[agent][day]?BASE[agent][day]:[];
-  const baseOB=baseBlocks.find(b=>b[0]==='Outbound');
-  const baseDur=baseOB?(t2m(baseOB[2])-t2m(baseOB[1])):30;
-  blocks=blocks.map(b=>{
-    if(b[0]==='Outbound'&&(t2m(b[2])-t2m(b[1]))>baseDur){
-      return[b[0],b[1],m2t(t2m(b[1])+baseDur)];
-    }
-    return b;
-  });
-  blocks=fillGapsWithOnPhones(blocks.sort((a,b)=>t2m(a[1])-t2m(b[1])));
   // Apply holiday transform first — keeps breaks, lunch, ticket time; replaces all else with On Phones
   const HOLIDAY_KEEP=['Break 1','Break 2','Lunch','Ticket Time'];
   if(noHoliday[dateStr]&&noHoliday[dateStr][agent]){
@@ -1702,12 +1665,7 @@ function gBlocks(agent,day,fw,tS,tF){
     partial=partial.filter(b=>t2m(b[2])>t2m(b[1])).sort((a,b)=>t2m(a[1])-t2m(b[1]));
     return partial;
   }
-  const someoneOOO=AGENTS.filter(a=>a!==agent&&ooo[a]&&ooo[a][dateStr]===true).length>0;
-  // If agent has a manual override for this date, always use it — never apply OOO coverage on top
-  const hasManualOverride=day==='Friday'
-    ?!!(friOverrides[fw]&&friOverrides[fw][agent]&&friOverrides[fw][agent][dateStr])
-    :!!(schedOverrides[agent]&&schedOverrides[agent][dateStr]);
-  if(someoneOOO&&!hasManualOverride) return applyOOOCoverage(blocks);
+  // OOO only affects the agent marked OOO — never changes other agents' schedules
   return blocks;
 }
 // Merge proposed blocks into an existing schedule.
@@ -3616,9 +3574,9 @@ function bamShowMoveAll(){
   document.getElementById('bam-add-panel').style.display='none';
   document.getElementById('bam-move-panel').style.display='none';
   document.getElementById('bam-move-all-panel').style.display='block';
-  const{block,day}=bam;
+  const{block,day,dateStr}=bam;
   document.getElementById('bam-move-all-act').textContent=block[0];
-  // Default to current times
+  document.getElementById('bam-all-date').value=dateStr||toISO(dateOfDay(day,weekOffset));
   document.getElementById('bam-all-start').value=block[1];
   document.getElementById('bam-all-end').value=block[2];
   bamUpdateAllPreview();
@@ -3628,14 +3586,15 @@ function bamUpdateAllPreview(){
   const{agent,day,fw}=bam;
   const ns=document.getElementById('bam-all-start').value;
   const ne=document.getElementById('bam-all-end').value;
+  const destDate=document.getElementById('bam-all-date').value;
   const act=bam.block?bam.block[0]:'Weekly Sync';
   if(!ns||!ne||t2m(ne)<=t2m(ns)){
     document.getElementById('bam-all-cov').innerHTML='';
     document.getElementById('bam-all-agents').innerHTML='';
     return;
   }
-
-  // Show which agents have this activity and where it'll move
+  const destDay=destDate?new Date(destDate+'T12:00:00').toLocaleDateString('en-US',{weekday:'long'}):day;
+  const sameDay=destDate===(bam.dateStr||toISO(dateOfDay(day,weekOffset)));
   const agentLines=AGENTS.map(a=>{
     const tz=ATZ[a];
     const aBlocks=getRawBlocks(a,day,fw,bam.dateStr);
@@ -3643,21 +3602,21 @@ function bamUpdateAllPreview(){
     const agentNS=convertToAgentTZ(ns,ATZ[agent],tz);
     const agentNE=convertToAgentTZ(ne,ATZ[agent],tz);
     const hasIt=!!existing;
+    const moveLabel=sameDay?'':`→ ${destDay}`;
     return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--border-light)">
       <div style="width:8px;height:8px;border-radius:50%;background:${hasIt?'#27500A':'#888'};flex-shrink:0"></div>
-      <span style="flex:1"><strong>${a}</strong> ${tz}</span>
-      <span style="color:var(--text-tertiary)">${hasIt?`${m2d(t2m(existing[1]))}–${m2d(t2m(existing[2]))} → `:'No ${act} · adding '}<strong style="color:var(--text-primary)">${m2d(t2m(agentNS))}–${m2d(t2m(agentNE))}</strong></span>
+      <span style="flex:1"><strong>${a}</strong> <span style="color:var(--text-tertiary)">${tz}</span></span>
+      <span style="color:var(--text-tertiary)">${hasIt?`${m2d(t2m(existing[1]))}–${m2d(t2m(existing[2]))} → `:''}${moveLabel} <strong style="color:var(--text-primary)">${m2d(t2m(agentNS))}–${m2d(t2m(agentNE))}</strong></span>
     </div>`;
   }).join('');
   document.getElementById('bam-all-agents').innerHTML=agentLines;
-
-  // Coverage preview using edited agent's blocks as proxy
-  const testBlocks=JSON.parse(JSON.stringify(getRawBlocks(agent,day,fw,bam.dateStr)));
+  // Coverage preview on destination day
+  const testBlocks=JSON.parse(JSON.stringify(getRawBlocks(agent,destDay,fw,destDate||bam.dateStr)));
   const idx=testBlocks.findIndex(b=>b[0]===act);
-  if(idx>=0) testBlocks[idx]=[act,ns,ne];
+  if(idx>=0&&sameDay) testBlocks[idx]=[act,ns,ne];
   else testBlocks.push([act,ns,ne]);
   testBlocks.sort((a,b)=>t2m(a[1])-t2m(b[1]));
-  document.getElementById('bam-all-cov').innerHTML=bamCovHTML(day,fw,agent,testBlocks);
+  document.getElementById('bam-all-cov').innerHTML=bamCovHTML(destDay,fw,agent,testBlocks);
 }
 
 function bamConfirmMoveAll(){
@@ -3665,34 +3624,61 @@ function bamConfirmMoveAll(){
   const act=bam.block?bam.block[0]:'Weekly Sync';
   const ns=document.getElementById('bam-all-start').value;
   const ne=document.getElementById('bam-all-end').value;
+  const destDate=document.getElementById('bam-all-date').value;
   if(!ns||!ne){alert('Please enter start and end times.');return;}
+  if(!destDate){alert('Please select a date.');return;}
   if(t2m(ne)<=t2m(ns)){alert('End time must be after start time.');return;}
 
-  // Apply to all agents — convert time from clicked agent's TZ to each agent's TZ
+  const srcDateStr=bam.dateStr||toISO(dateOfDay(day,weekOffset));
+  const destD=new Date(destDate+'T12:00:00');
+  const destDay=destD.toLocaleDateString('en-US',{weekday:'long'});
+  const sameDay=destDate===srcDateStr;
+
   AGENTS.forEach(a=>{
     const tz=ATZ[a];
     const agentNS=convertToAgentTZ(ns,ATZ[agent],tz);
     const agentNE=convertToAgentTZ(ne,ATZ[agent],tz);
-    const aBlocks=JSON.parse(JSON.stringify(getRawBlocks(a,day,fw,bam.dateStr)));
-    const idx=aBlocks.findIndex(b=>b[0]===act);
-    if(idx>=0){
-      aBlocks[idx]=[act,agentNS,agentNE];
-    } else {
-      // Agent doesn't have this block — add it
-      aBlocks.push([act,agentNS,agentNE]);
+
+    // Remove from source day
+    if(!sameDay){
+      const srcBlocks=JSON.parse(JSON.stringify(getRawBlocks(a,day,fw,srcDateStr)));
+      const srcIdx=srcBlocks.findIndex(b=>b[0]===act);
+      if(srcIdx>=0) srcBlocks.splice(srcIdx,1);
+      const cleanSrc=fillGapsWithOnPhones(srcBlocks.sort((x,y)=>t2m(x[1])-t2m(y[1])));
+      if(day==='Friday'){
+        if(!friOverrides[fw]) friOverrides[fw]={};
+        if(!friOverrides[fw][a]) friOverrides[fw][a]={};
+        friOverrides[fw][a][srcDateStr]=cleanSrc;
+      } else {
+        if(!schedOverrides[a]) schedOverrides[a]={};
+        schedOverrides[a][srcDateStr]=cleanSrc;
+      }
     }
-    aBlocks.sort((x,y)=>t2m(x[1])-t2m(y[1]));
-    const cleanBlocks=fillGapsWithOnPhones(aBlocks);
-    const dateStr=bam.dateStr||toISO(dateOfDay(day,weekOffset));
-    if(day==='Friday'){
-      if(!friOverrides[fw]) friOverrides[fw]={};
-      if(!friOverrides[fw][a]) friOverrides[fw][a]={};
-      friOverrides[fw][a][dateStr]=cleanBlocks;
+
+    // Add to destination day
+    const savedWO=weekOffset;
+    for(let wo=-52;wo<=52;wo++){if(toISO(dateOfDay(destDay,wo))===destDate){weekOffset=wo;break;}}
+    const destFW=destDay==='Friday'?getFriWeekForDate(destD):1;
+    const destBlocks=JSON.parse(JSON.stringify(getRawBlocks(a,destDay,destFW,destDate)));
+    weekOffset=savedWO;
+
+    if(sameDay){
+      const idx=destBlocks.findIndex(b=>b[0]===act);
+      if(idx>=0) destBlocks[idx]=[act,agentNS,agentNE];
+      else destBlocks.push([act,agentNS,agentNE]);
+    } else {
+      destBlocks.push([act,agentNS,agentNE]);
+    }
+    const cleanDest=fillGapsWithOnPhones(destBlocks.sort((x,y)=>t2m(x[1])-t2m(y[1])));
+    if(destDay==='Friday'){
+      if(!friOverrides[destFW]) friOverrides[destFW]={};
+      if(!friOverrides[destFW][a]) friOverrides[destFW][a]={};
+      friOverrides[destFW][a][destDate]=cleanDest;
     } else {
       if(!schedOverrides[a]) schedOverrides[a]={};
-      schedOverrides[a][dateStr]=cleanBlocks;
+      schedOverrides[a][destDate]=cleanDest;
     }
-    notifyAgentScheduleChange(a,dateStr,cleanBlocks);
+    notifyAgentScheduleChange(a,destDate,cleanDest);
   });
 
   closeBam();
